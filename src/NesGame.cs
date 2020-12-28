@@ -38,7 +38,7 @@ namespace Nessie
                 _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
             }
             _font = Content.Load<SpriteFont>("Font");
-            var cartridge = new Cartridge("Content/roms/nestest.nes");
+            var cartridge = new Cartridge("Content/roms/dk.nes");
             _nes.InsertCartridge(cartridge);
             _nes.Reset();
         }
@@ -211,7 +211,9 @@ namespace Nessie
             sw.Restart();
             sw.Start();
             GraphicsDevice.Clear(Color.CornflowerBlue);
-            var patternTable = _nes.Ppu.GetPatternTable(0, _palette);
+
+            // HACK! only used for debugging purposes. 
+            var patternTable = _nes.Ppu.GetPatternTable(1, _palette);
             var data = new UInt32[341 * 261];
             var nametable = _nes.Ppu.GetNameTable(0);
             for (var y = 0; y < 30; y++)
