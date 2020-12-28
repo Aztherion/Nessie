@@ -35,52 +35,19 @@ namespace Nessie
         long renderFrameMs = 0;
         long drawMs = 0;
         byte frameCount = 0;
+        long drawCount = 0;
         Stopwatch sw = new Stopwatch();
         bool runEmulation = false;
         List<Keys> downKeys = new List<Keys>();
-
+        double residualTime = 0;
+        double previousFrameGameTime = 0;
+        double fps = 0;
+        Stopwatch runSw = new Stopwatch();
+        long elapsedRunMs = 0;
         protected override void Update(GameTime gameTime)
         {
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
-
-            if (Keyboard.GetState().IsKeyDown(Keys.C) && !downKeys.Contains(Keys.C))
-            {
-                downKeys.Add(Keys.C);
-                do
-                {
-                    _nes.Clock();
-                } while (!_nes.Cpu.Complete);
-            }
-            if (Keyboard.GetState().IsKeyUp(Keys.C) && downKeys.Contains(Keys.C))
-            {
-                downKeys.Remove(Keys.C);
-            }
-
-            if (Keyboard.GetState().IsKeyDown(Keys.F) && !downKeys.Contains(Keys.F))
-            {
-                downKeys.Add(Keys.F);
-                sw.Reset();
-                sw.Start();
-
-                do
-                {
-                    _nes.Clock();
-                } while (!_nes.Cpu.Complete);
-                do
-                {
-                    _nes.Clock();
-                } while (!_nes.Ppu.FrameComplete);
-                _nes.Ppu.FrameComplete = false;
-                sw.Stop();
-
-                renderFrameMs = sw.ElapsedMilliseconds;
-            }
-
-            if (Keyboard.GetState().IsKeyUp(Keys.F) && downKeys.Contains(Keys.F))
-            {
-                downKeys.Remove(Keys.F);
-            }
 
             if (Keyboard.GetState().IsKeyDown(Keys.R))
             {
@@ -91,36 +58,99 @@ namespace Nessie
             {
                 downKeys.Add(Keys.Space);
                 runEmulation = !runEmulation;
-            }
-
-            if (Keyboard.GetState().IsKeyUp(Keys.Space) && downKeys.Contains(Keys.Space))
+                if (runEmulation)
+                {
+                    runSw.Reset();
+                    runSw.Start();
+                    frameCount = 0;
+                }
+                if (!runEmulation)
+                {
+                    runSw.Stop();
+                    elapsedRunMs = runSw.ElapsedMilliseconds;
+                }
+            } 
+            else if (Keyboard.GetState().IsKeyUp(Keys.Space) && downKeys.Contains(Keys.Space))
             {
                 downKeys.Remove(Keys.Space);
             }
             
-            if (runEmulation)
+            if (!runEmulation)
             {
-                sw.Reset();
-                sw.Start();
-
-                do
+                if (Keyboard.GetState().IsKeyDown(Keys.C) && !downKeys.Contains(Keys.C))
                 {
-                    _nes.Clock();
-                } while (!_nes.Cpu.Complete);
-                do
+                    downKeys.Add(Keys.C);
+                    do
+                    {
+                        _nes.Clock();
+                    } while (!_nes.Cpu.Complete);
+                } else if (Keyboard.GetState().IsKeyUp(Keys.C) && downKeys.Contains(Keys.C))
                 {
-                    _nes.Clock();
-                } while (!_nes.Ppu.FrameComplete);
-                _nes.Ppu.FrameComplete = false;
-                sw.Stop();
+                    downKeys.Remove(Keys.C);
+                }
 
-                renderFrameMs = sw.ElapsedMilliseconds;
+                if (Keyboard.GetState().IsKeyDown(Keys.F) && !downKeys.Contains(Keys.F))
+                {
+                    downKeys.Add(Keys.F);
+                    sw.Reset();
+                    sw.Start();
+
+                    do
+                    {
+                        _nes.Clock();
+                    } while (!_nes.Cpu.Complete);
+                    do
+                    {
+                        _nes.Clock();
+                    } while (!_nes.Ppu.FrameComplete);
+                    _nes.Ppu.FrameComplete = false;
+                    sw.Stop();
+
+                    renderFrameMs = sw.ElapsedMilliseconds;
+                } else if (Keyboard.GetState().IsKeyUp(Keys.F) && downKeys.Contains(Keys.F))
+                {
+                    downKeys.Remove(Keys.F);
+                }
             }
             base.Update(gameTime); 
         }
 
         protected override void Draw(GameTime gameTime)
         {
+            if (runEmulation)
+            {
+                if (residualTime >= 0)
+                {
+                    residualTime -= gameTime.ElapsedGameTime.TotalMilliseconds;
+                }
+                else
+                {
+                    var now = runSw.ElapsedMilliseconds;
+
+                    fps = 1000f / (now - previousFrameGameTime);
+
+                    residualTime = (1000f / 60f) - gameTime.ElapsedGameTime.TotalMilliseconds;
+                    sw.Reset();
+                    sw.Start();
+
+                    do
+                    {
+                        _nes.Clock();
+                    } while (!_nes.Cpu.Complete);
+                    do
+                    {
+                        _nes.Clock();
+                    } while (!_nes.Ppu.FrameComplete);
+                    _nes.Ppu.FrameComplete = false;
+                    sw.Stop();
+
+                    renderFrameMs = sw.ElapsedMilliseconds;
+                    residualTime -= renderFrameMs;
+                    previousFrameGameTime = now;
+                    frameCount++;
+                }
+
+            }
             sw.Restart();
             sw.Start();
             GraphicsDevice.Clear(Color.CornflowerBlue);
@@ -138,14 +168,17 @@ namespace Nessie
             _spriteBatch.DrawString(_font, $"INS: {_nes.Cpu.CurrentInstruction.Replace("$", "0x").Replace("_", " ")}", new Vector2(10, 130), Color.Black);
             _spriteBatch.DrawString(_font, $"Render MS: {renderFrameMs:F0}", new Vector2(10, 150), Color.Black);
             _spriteBatch.DrawString(_font, $"Draw MS: {drawMs:F0}", new Vector2(10, 170), Color.Black);
-            _spriteBatch.DrawString(_font, $"FrameCount: {frameCount:F0}", new Vector2(10, 190), Color.Black);
+            _spriteBatch.DrawString(_font, $"Frame Count: {frameCount:F0}", new Vector2(10, 190), Color.Black);
             _spriteBatch.DrawString(_font, $"SysClk: {_nes.SystemClockCounter:F0}", new Vector2(10, 210), Color.Black);
-            _spriteBatch.DrawString(_font, $"Run: {runEmulation:F0}", new Vector2(10, 230), Color.Black);
+            _spriteBatch.DrawString(_font, $"FPS: {fps:F2}", new Vector2(10, 230), Color.Black);
+            _spriteBatch.DrawString(_font, $"Run: {runEmulation}", new Vector2(10, 250), Color.Black);
+            _spriteBatch.DrawString(_font, $"Run MS: {elapsedRunMs:0}", new Vector2(10, 270), Color.Black);
+            _spriteBatch.DrawString(_font, $"Draw count: {drawCount:0}", new Vector2(10, 290), Color.Black);
             _spriteBatch.End();
             base.Draw(gameTime);
             sw.Stop();
             drawMs = sw.ElapsedMilliseconds;
-            frameCount++;
+            drawCount++;
         }
 
         private string GetStatusString()
