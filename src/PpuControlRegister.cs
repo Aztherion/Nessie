@@ -8,7 +8,8 @@
         public bool B { get; set; }
         public bool S { get; set; }
         public bool I { get; set; }
-        public byte NameTableSelect { get; set; }
+        public bool NameTableX { get; set; }
+        public bool NameTableY { get; set; }
 
         public void Set(byte b)
         {
@@ -18,9 +19,8 @@
             B = IsBitSet(b, 4);
             S = IsBitSet(b, 3);
             I = IsBitSet(b, 2);
-            NameTableSelect = (byte)(IsBitSet(b, 1) ? 1 : 0);
-            NameTableSelect = (byte)(NameTableSelect << 1);
-            NameTableSelect += (byte)(IsBitSet(b, 0) ? 1 : 0);
+            NameTableY = IsBitSet(b, 1);
+            NameTableX = IsBitSet(b, 0);
         }
 
         public byte Get()
@@ -38,9 +38,9 @@
             b = (byte)(b << 1);
             b += (byte)(I ? 1 : 0);
             b = (byte)(b << 1);
-            b += (byte)(IsBitSet(NameTableSelect, 1) ? 1 : 0);
+            b += (byte)(NameTableX ? 1 : 0);
             b = (byte)(b << 1);
-            b += (byte)(IsBitSet(NameTableSelect, 0) ? 1 : 0);
+            b += (byte)(NameTableY ? 1 : 0);
             return b;
         }
 

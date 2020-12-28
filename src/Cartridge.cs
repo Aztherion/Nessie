@@ -14,6 +14,8 @@ namespace Nessie
 
         private Mapper _mapper;
 
+        public Mirror Mirror;
+
         public Cartridge(string filename)
         {
             Load(filename);
@@ -78,6 +80,7 @@ namespace Nessie
                 }
 
                 mapperId = (byte)(((header.mapper2 >> 4) << 4) | (header.mapper1 >> 4));
+                Mirror = (header.mapper1 & 0x01) == 0x01 ? Mirror.Vertical : Mirror.Horizontal;
 
                 byte fileType = 1;
 
@@ -125,5 +128,13 @@ namespace Nessie
         public byte tvSystem1;
         public byte tvSystem2;
         public fixed byte unused[5];
+    }
+
+    public enum Mirror
+    {
+        Horizontal,
+        Vertical,
+        OneScreenLow,
+        OneScreenHigh
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 
 namespace Nessie
 {
@@ -15,6 +16,7 @@ namespace Nessie
         SpriteFont _font;
         Texture2D _frameCanvas;
         Texture2D[] _patternTableCanvas;
+        Texture2D[] _paletteCanvas;
 
         public NesGame()
         {
@@ -30,6 +32,11 @@ namespace Nessie
             _patternTableCanvas = new Texture2D[2];
             _patternTableCanvas[0] = new Texture2D(GraphicsDevice, 128, 128);
             _patternTableCanvas[1] = new Texture2D(GraphicsDevice, 128, 128);
+            _paletteCanvas = new Texture2D[8];
+            for (var i = 0; i < 8; i++)
+            {
+                _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
+            }
             _font = Content.Load<SpriteFont>("Font");
             var cartridge = new Cartridge("Content/roms/nestest.nes");
             _nes.InsertCartridge(cartridge);
@@ -48,6 +55,30 @@ namespace Nessie
         double fps = 0;
         Stopwatch runSw = new Stopwatch();
         long elapsedRunMs = 0;
+
+        private void ExportNametable(int nametableId)
+        {
+            var nametable = _nes.Ppu.GetNameTable(nametableId);
+            var filename = @"c:\tmp\nametable_" + nametableId + ".txt";
+            if (File.Exists(filename)) File.Delete(filename);
+            using (var fs = new FileStream(filename, FileMode.OpenOrCreate))
+            {
+                using (var sw = new StreamWriter(fs))
+                {
+                    for (var y = 0; y < 32; y++)
+                    {
+                        for (var x = 0; x < 32; x++)
+                        {
+                            var ix = y * 32 + x;
+                            var s = nametable[ix].ToString("X").PadLeft(2, '0') + " ";
+                            sw.Write(s);
+                        }
+                        sw.WriteLine();
+                    }
+                }
+            }
+        }
+
         protected override void Update(GameTime gameTime)
         {
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
@@ -56,6 +87,17 @@ namespace Nessie
             if (Keyboard.GetState().IsKeyDown(Keys.R))
             {
                 _nes.Reset();
+            }
+
+            if (Keyboard.GetState().IsKeyDown(Keys.E) && !downKeys.Contains(Keys.E))
+            {
+                downKeys.Add(Keys.E);
+                ExportNametable(0);
+                ExportNametable(1);
+            }
+            else if (Keyboard.GetState().IsKeyUp(Keys.E) && downKeys.Contains(Keys.E))
+            {
+                downKeys.Remove(Keys.E);
             }
 
             if (Keyboard.GetState().IsKeyDown(Keys.Space) && !downKeys.Contains(Keys.Space))
@@ -73,12 +115,21 @@ namespace Nessie
                     runSw.Stop();
                     elapsedRunMs = runSw.ElapsedMilliseconds;
                 }
-            } 
+            }
             else if (Keyboard.GetState().IsKeyUp(Keys.Space) && downKeys.Contains(Keys.Space))
             {
                 downKeys.Remove(Keys.Space);
             }
-            
+
+            if (Keyboard.GetState().IsKeyDown(Keys.P) && !downKeys.Contains(Keys.P))
+            {
+                downKeys.Add(Keys.P);
+                _palette = (byte)((_palette + 1) % 8);
+            } else if (Keyboard.GetState().IsKeyUp(Keys.P) && downKeys.Contains(Keys.P))
+            {
+                downKeys.Remove(Keys.P);
+            }
+
             if (!runEmulation)
             {
                 if (Keyboard.GetState().IsKeyDown(Keys.C) && !downKeys.Contains(Keys.C))
@@ -116,8 +167,10 @@ namespace Nessie
                     downKeys.Remove(Keys.F);
                 }
             }
-            base.Update(gameTime); 
+            base.Update(gameTime);
         }
+
+        byte _palette = 0;
 
         protected override void Draw(GameTime gameTime)
         {
@@ -158,14 +211,55 @@ namespace Nessie
             sw.Restart();
             sw.Start();
             GraphicsDevice.Clear(Color.CornflowerBlue);
-            _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
-            _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, 0), 0, 128 * 128);
-            _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, 0), 0, 128 * 128);
+            var patternTable = _nes.Ppu.GetPatternTable(0, _palette);
+            var data = new UInt32[341 * 261];
+            var nametable = _nes.Ppu.GetNameTable(0);
+            for (var y = 0; y < 30; y++)
+            {
+                for (var x = 0;x < 32; x++)
+                {
+                    var ix = y * 32 + x;
+                    var id = nametable[ix];
+
+                    //var left = (id & 0x0F) << 3;
+                    //var top = ((id >> 4) & 0x0F) << 3;
+
+                    var left = id & 0x0F;
+                    var top = (id >> 0x4) & 0x0F;
+
+                    for(var py = 0; py < 8; py++)
+                    {
+                        for(var px = 0; px < 8; px++)
+                        {
+
+                            var srcIx = (((top*8) + py) * 128) + (left * 8) + px;
+                            //var srcIx = (py + left * 8) + (px + top * 8);
+                            var dstIx = ((y*8) + py) * 341 + (x*8) + px;
+                            data[dstIx] = patternTable[srcIx];
+                        }
+                    }
+
+                }
+            }
+
+            //_frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
+            _frameCanvas.SetData<UInt32>(data, 0, 341 * 261);
+            _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, _palette), 0, 128 * 128);
+            _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, _palette), 0, 128 * 128);
+            for(var i = 0; i < 8; i++)
+            {
+                _paletteCanvas[i].SetData<UInt32>(GetPaletteData((byte)i), 0, 10 * 40);
+            }
 
             _spriteBatch.Begin();
             _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 341, 261), Color.White);
             _spriteBatch.Draw(_patternTableCanvas[0], new Rectangle(400, 300, 128, 128), Color.White);
             _spriteBatch.Draw(_patternTableCanvas[1], new Rectangle(535, 300, 128, 128), Color.White);
+            
+            for(var i = 0; i < 8; i++)
+            {
+                _spriteBatch.Draw(_paletteCanvas[i], new Rectangle(400 + (i * 45), 440, 40, 10), Color.White);
+            }
             _spriteBatch.DrawString(_font, $"A: 0x{_nes.Cpu.A:X}", new Vector2(10, 10), Color.Black);
             _spriteBatch.DrawString(_font, $"X: 0x{_nes.Cpu.X:X}", new Vector2(10, 30), Color.Black);
             _spriteBatch.DrawString(_font, $"Y: 0x{_nes.Cpu.Y:X}", new Vector2(10, 50), Color.Black);
@@ -186,6 +280,24 @@ namespace Nessie
             sw.Stop();
             drawMs = sw.ElapsedMilliseconds;
             drawCount++;
+        }
+
+        private UInt32[] GetPaletteData(byte palette)
+        {
+            var ret = new UInt32[10 * 40];
+
+            var pixels = _nes.Ppu.GetPalettePixels(palette);
+            for(var y = 0; y < 10; y++)
+            {
+                for(var x = 0; x < 40; x++)
+                {
+                    var ix = x / 10;
+                    var pixel = pixels[ix];
+                    ret[y * 40 + x] = pixel.ToUInt32();
+                }
+            }
+
+            return ret;
         }
 
         private string GetStatusString()

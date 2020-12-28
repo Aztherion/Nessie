@@ -18,7 +18,7 @@ namespace Nessie
         {
             UInt32 i = 0xFF;
             i = i << 8;
-            i = R;
+            i += R;
             i = i << 8;
             i += G;
             i = i << 8;

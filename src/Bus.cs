@@ -83,6 +83,13 @@ namespace Nessie
             {
                 Cpu.Clock(SystemClockCounter);
             }
+
+            if (Ppu.NMI)
+            {
+                Ppu.NMI = false;
+                Cpu.NMI();
+            }
+
             SystemClockCounter++;
         }
     }
