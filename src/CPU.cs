@@ -23,6 +23,7 @@ namespace Nessie
         private Bus Bus;
         private int Cycles;
         private long InstructionCount = 1;
+        private bool OutputToConsole = false;
         public CPU()
         {
             InitializeInstructionTable();
@@ -311,42 +312,47 @@ namespace Nessie
             OpcodeFuncPtrTable[(int)Opcode.RRA_IND_X] = RRA_IND_X;
             OpcodeFuncPtrTable[(int)Opcode.RRA_IND_Y] = RRA_IND_Y;
 
-            OpcodeFuncPtrTable[0x04] = InvalidOperationOneByteNineCycles;
-            OpcodeFuncPtrTable[0x44] = InvalidOperationOneByteNineCycles;
-            OpcodeFuncPtrTable[0x64] = InvalidOperationOneByteNineCycles;
-            OpcodeFuncPtrTable[0x0C] = InvalidOperationTwoBytesTwelveCycles;
-            OpcodeFuncPtrTable[0x80] = InvalidOperationOneByteSixCycles;
+            OpcodeFuncPtrTable[0x1A] = NOP;
+            OpcodeFuncPtrTable[0x3A] = NOP;
+            OpcodeFuncPtrTable[0x5A] = NOP;
+            OpcodeFuncPtrTable[0x7A] = NOP;
+            OpcodeFuncPtrTable[0xDA] = NOP;
+            OpcodeFuncPtrTable[0xFA] = NOP;
 
-            OpcodeFuncPtrTable[0x14] = InvalidOperationOneByteTwelveCycles;
-            OpcodeFuncPtrTable[0x34] = InvalidOperationOneByteTwelveCycles;
-            OpcodeFuncPtrTable[0x54] = InvalidOperationOneByteTwelveCycles;
-            OpcodeFuncPtrTable[0x74] = InvalidOperationOneByteTwelveCycles;
-            OpcodeFuncPtrTable[0xD4] = InvalidOperationOneByteTwelveCycles;
-            OpcodeFuncPtrTable[0xF4] = InvalidOperationOneByteTwelveCycles;
+            OpcodeFuncPtrTable[0x80] = SKB;
+            OpcodeFuncPtrTable[0x82] = SKB;
+            OpcodeFuncPtrTable[0x89] = SKB;
+            OpcodeFuncPtrTable[0xC2] = SKB;
+            OpcodeFuncPtrTable[0xE2] = SKB;
 
-            OpcodeFuncPtrTable[0x1C] = InvalidOperationTwoBytesFifteenCycles;
-            OpcodeFuncPtrTable[0x3C] = InvalidOperationTwoBytesFifteenCycles;
-            OpcodeFuncPtrTable[0x5C] = InvalidOperationTwoBytesFifteenCycles;
-            OpcodeFuncPtrTable[0x7C] = InvalidOperationTwoBytesFifteenCycles;
-            OpcodeFuncPtrTable[0xDC] = InvalidOperationTwoBytesFifteenCycles;
-            OpcodeFuncPtrTable[0xFC] = InvalidOperationTwoBytesFifteenCycles;
-            
-            
-            
-            OpcodeFuncPtrTable[0x1A] = InvalidOperationZeroBytesSixCycles;
-            OpcodeFuncPtrTable[0x3A] = InvalidOperationZeroBytesSixCycles;
-            OpcodeFuncPtrTable[0x5A] = InvalidOperationZeroBytesSixCycles;
-            OpcodeFuncPtrTable[0x7A] = InvalidOperationZeroBytesSixCycles;
-            OpcodeFuncPtrTable[0xDA] = InvalidOperationZeroBytesSixCycles;
-            OpcodeFuncPtrTable[0xFA] = InvalidOperationZeroBytesSixCycles;
+            OpcodeFuncPtrTable[0x0C] = IGN_ABS;
+            OpcodeFuncPtrTable[0x1C] = IGN_ABS_X;
+            OpcodeFuncPtrTable[0x3C] = IGN_ABS_X;
+            OpcodeFuncPtrTable[0x5C] = IGN_ABS_X;
+            OpcodeFuncPtrTable[0x7C] = IGN_ABS_X;
+            OpcodeFuncPtrTable[0xDC] = IGN_ABS_X;
+            OpcodeFuncPtrTable[0xFC] = IGN_ABS_X;
+
+            OpcodeFuncPtrTable[0x04] = IGN_ZP;
+            OpcodeFuncPtrTable[0x44] = IGN_ZP;
+            OpcodeFuncPtrTable[0x64] = IGN_ZP;
+
+            OpcodeFuncPtrTable[0x14] = IGN_ZPX;
+            OpcodeFuncPtrTable[0x34] = IGN_ZPX;
+            OpcodeFuncPtrTable[0x54] = IGN_ZPX;
+            OpcodeFuncPtrTable[0x74] = IGN_ZPX;
+            OpcodeFuncPtrTable[0xD4] = IGN_ZPX;
+            OpcodeFuncPtrTable[0xF4] = IGN_ZPX;
         }
 
         public void Clock(ulong systemClock)
         {
             if (Cycles <= 0)
             {
-                //Console.WriteLine();
-                //Console.Write($"{InstructionCount}\t{PC:X} ");
+                if (OutputToConsole) 
+                { 
+                    Console.Write($"{InstructionCount}\t{PC:X} "); 
+                } 
                 
                 var a = A.ToString("X");
                 var x = X.ToString("X");
@@ -363,7 +369,10 @@ namespace Nessie
                 }
                 var opcode = ReadByte();
                 OpcodeFuncPtrTable[opcode]();
-                //Console.Write($"\t\tA:{a} X:{x} Y:{y} P:{p} SP:{sp} CYC:{((systemClock-24)%341),3}\r\n");
+                if (OutputToConsole) 
+                { 
+                    Console.Write($"\t\tA:{a} X:{x} Y:{y} P:{p} SP:{sp} CYC:{((systemClock - 24) % 341),3}\r\n"); 
+                }
             }
             else
             {
@@ -384,7 +393,6 @@ namespace Nessie
         {
             var data = ReadByte(PC);
             PC++;
-            //Console.Write($" {data:X}");
             return data;
         }
 
@@ -398,7 +406,10 @@ namespace Nessie
         private byte ReadByte(ushort address)
         {
             var data = Bus.CpuRead(address);
-            //Console.Write($" {data:X}");
+            if (OutputToConsole)
+            {
+                Console.Write($" {data:X}");
+            }
             return data;
         }
 
@@ -2827,13 +2838,47 @@ namespace Nessie
             Cycles += 2;
         }
 
+        private void SKB()
+        {
+            ReadByte(); // Skip the byte
+            CurrentInstruction = "SKB";
+            Cycles += 2;
+        }
+
+        private void IGN_ZP() 
+        {
+            ReadByte(); // throw away
+            CurrentInstruction = "IGN_ZP";
+            Cycles += 3;
+        }
+
+        private void IGN_ZPX() 
+        {
+            ReadByte(); // throw away
+            CurrentInstruction = "IGN_ZPX";
+            Cycles += 4;
+        }
+
+        private void IGN_ABS() 
+        {
+            ReadByte();
+            ReadByte();
+            CurrentInstruction = "IGN_ABS";
+            Cycles += 4;
+        }
+
+        private void IGN_ABS_X()
+        {
+            GetAbsoluteIndexedAddress(X); // throw away;
+            CurrentInstruction = "IGN_ABS_X";
+            Cycles += 5;
+        }
+
         private void RTI()
         {
             var status = Pop();
             P.N = IsBitSet(status, 7);
             P.V = IsBitSet(status, 6);
-            //P.U = IsBitSet(status, 5);
-            //P.B = false;
             P.D = IsBitSet(status, 3);
             P.I = IsBitSet(status, 2);
             P.Z = IsBitSet(status, 1);
@@ -2850,49 +2895,6 @@ namespace Nessie
         private void InvalidOperationException()
         {
             throw new InvalidOperationException();
-        }
-
-        private void InvalidOperationZeroBytesSixCycles()
-        {
-            CurrentInstruction = "*NOP";
-            Cycles += 6;
-        }
-
-        private void InvalidOperationOneByteSixCycles()
-        {
-            ReadByte();
-            CurrentInstruction = "*NOP";
-            Cycles += 6;
-        }
-
-        private void InvalidOperationOneByteNineCycles()
-        {
-            ReadByte();
-            CurrentInstruction = "*NOP";
-            Cycles += 9;
-        }
-
-        private void InvalidOperationOneByteTwelveCycles()
-        {
-            ReadByte();
-            CurrentInstruction = "*NOP";
-            Cycles += 12;
-        }
-
-        private void InvalidOperationTwoBytesTwelveCycles()
-        {
-            ReadByte();
-            ReadByte();
-            CurrentInstruction = "*NOP";
-            Cycles += 12;
-        }
-
-        private void InvalidOperationTwoBytesFifteenCycles()
-        {
-            ReadByte();
-            ReadByte();
-            CurrentInstruction = "*NOP";
-            Cycles += 15;
         }
 
         #region Addressing modes

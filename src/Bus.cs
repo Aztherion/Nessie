@@ -7,7 +7,7 @@ namespace Nessie
         public CPU Cpu;
         public PPU Ppu;
         private byte[] _cpuRam = new byte[2048];
-        private UInt64 _systemClockCounter;
+        public UInt64 SystemClockCounter;
         private Cartridge _cartridge;
 
         public Bus()
@@ -73,17 +73,17 @@ namespace Nessie
         public void Reset() 
         {
             Cpu.Reset();
-            _systemClockCounter = 0;
+            SystemClockCounter = 0;
         }
 
         public void Clock() 
         {
             Ppu.Clock();
-            if (_systemClockCounter % 3 == 0)
+            if (SystemClockCounter % 3 == 0)
             {
-                Cpu.Clock(_systemClockCounter);
+                Cpu.Clock(SystemClockCounter);
             }
-            _systemClockCounter++;
+            SystemClockCounter++;
         }
     }
 }

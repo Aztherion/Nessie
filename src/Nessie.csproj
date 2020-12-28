@@ -72,8 +72,12 @@
     <None Include="Content\Font.xnb">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Include="Content\nestest.nes" />
-    <None Include="Content\ram_retain.nes" />
+    <None Include="Content\roms\nestest.nes">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\roms\ram_retain.nes">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
