@@ -13,7 +13,8 @@ namespace Nessie
         private readonly Bus _nes;
         SpriteBatch _spriteBatch;
         SpriteFont _font;
-        Texture2D _canvas;
+        Texture2D _frameCanvas;
+        Texture2D[] _patternTableCanvas;
 
         public NesGame()
         {
@@ -25,7 +26,10 @@ namespace Nessie
         protected override void LoadContent()
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
-            _canvas = new Texture2D(GraphicsDevice, 341, 261);
+            _frameCanvas = new Texture2D(GraphicsDevice, 341, 261);
+            _patternTableCanvas = new Texture2D[2];
+            _patternTableCanvas[0] = new Texture2D(GraphicsDevice, 128, 128);
+            _patternTableCanvas[1] = new Texture2D(GraphicsDevice, 128, 128);
             _font = Content.Load<SpriteFont>("Font");
             var cartridge = new Cartridge("Content/roms/nestest.nes");
             _nes.InsertCartridge(cartridge);
@@ -154,11 +158,14 @@ namespace Nessie
             sw.Restart();
             sw.Start();
             GraphicsDevice.Clear(Color.CornflowerBlue);
-            _canvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
+            _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
+            _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, 0), 0, 128 * 128);
+            _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, 0), 0, 128 * 128);
+
             _spriteBatch.Begin();
-            
-            _spriteBatch.Draw(_canvas, new Rectangle(400, 10, 341, 261), Color.White);
-            //_spriteBatch.Draw(_canvas, new Rectangle(10, 10, 1, 1), Color.White);
+            _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 341, 261), Color.White);
+            _spriteBatch.Draw(_patternTableCanvas[0], new Rectangle(400, 300, 128, 128), Color.White);
+            _spriteBatch.Draw(_patternTableCanvas[1], new Rectangle(535, 300, 128, 128), Color.White);
             _spriteBatch.DrawString(_font, $"A: 0x{_nes.Cpu.A:X}", new Vector2(10, 10), Color.Black);
             _spriteBatch.DrawString(_font, $"X: 0x{_nes.Cpu.X:X}", new Vector2(10, 30), Color.Black);
             _spriteBatch.DrawString(_font, $"Y: 0x{_nes.Cpu.Y:X}", new Vector2(10, 50), Color.Black);

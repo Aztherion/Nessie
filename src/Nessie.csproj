@@ -63,7 +63,11 @@
     <Compile Include="CPU.cs" />
     <Compile Include="Mapper.cs" />
     <Compile Include="NesGame.cs" />
+    <Compile Include="NesPixel.cs" />
     <Compile Include="PPU.cs" />
+    <Compile Include="PpuControlRegister.cs" />
+    <Compile Include="PpuMaskRegister.cs" />
+    <Compile Include="PpuStatusRegister.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

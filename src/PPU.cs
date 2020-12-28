@@ -1,36 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Nessie
 {
-    public  class NesPixel
-    {
-        public byte R { get; set; }
-        public byte G { get; set; }
-        public byte B { get; set; }
-        public NesPixel(byte r, byte g, byte b)
-        {
-            R = r;
-            G = g;
-            B = b;
-        }
-
-        public UInt32 ToUInt32()
-        {
-            UInt32 i = 0xFF;
-            i = i << 8;
-            i = R;
-            i = i << 8;
-            i += G;
-            i = i << 8;
-            i += B;
-            return i;
-        }
-    }
-
     unsafe public class PPU
     {
         public bool FrameComplete = false;
@@ -39,21 +10,31 @@ namespace Nessie
         private Cartridge _cartridge;
         private byte[] _tblName = new byte[2048];
         private byte[] _tblPalette = new byte[32];
+        private byte[][] _tblPattern = new byte[2][];
         private ushort _cycle;
         private short _scanline = -1;
-        
-        private UInt32[][] _frames = new UInt32[2][];
+
+        private PpuControlRegister _ctrlRegister;
+        private PpuMaskRegister _maskRegister;
+        private PpuStatusRegister _statusRegister;
+
+        private UInt32[][] _sprNameTables = new uint[2][];
+        private UInt32[][] _sprPatternTables = new UInt32[2][];
+        private UInt32[][] _sprFrames = new UInt32[2][];
+
         private byte _activeFrame = 0;
         Random rnd = new Random();
-
-        private NesPixel[] _ps = new NesPixel[0x40];
 
         private NesPixel[] _palScreen = new NesPixel[0x40];
 
         public PPU() 
         {
             InitPalScreen();
-            InitFrames();
+            InitSprFrames();
+            InitSprPatternTables();
+            InitSprNameTables();
+            _tblPattern[0] = new byte[4096];
+            _tblPattern[1] = new byte[4096];
         }
 
         private void InitPalScreen()
@@ -126,31 +107,96 @@ namespace Nessie
             _palScreen[0x3E] = new NesPixel(0, 0, 0);
             _palScreen[0x3F] = new NesPixel(0, 0, 0);
         }
-        private void InitFrames()
+        private void InitSprFrames()
         {
-            _frames[0] = new UInt32[342 * 262];
-            _frames[1] = new UInt32[342 * 262];
+            _sprFrames[0] = new UInt32[342 * 262];
+            _sprFrames[1] = new UInt32[342 * 262];
             for(var i = 0; i < 341 * 261; i++)
             {
-                _frames[0][i] = 0xFF0000FF;
-                _frames[1][i] = 0xFF00FF00;
+                _sprFrames[0][i] = 0xFF0000FF;
+                _sprFrames[1][i] = 0xFF00FF00;
             }
             _activeFrame = 0;
         }
 
-        public UInt32[] GetActiveFrame()
+        private void InitSprPatternTables()
         {
-            return _frames[_activeFrame];
+            _sprPatternTables[0] = new uint[128 * 128];
+            _sprPatternTables[1] = new uint[128 * 128];
+            for(var i = 0; i < 128 * 128; i++)
+            {
+                _sprPatternTables[0][i] = 0xFF000000;
+                _sprPatternTables[1][i] = 0xFF000000;
+            }
         }
 
+        private void InitSprNameTables()
+        {
+            _sprNameTables[0] = new uint[256 * 240];
+            _sprNameTables[1] = new uint[256 * 240];
+            for(var i = 0; i < 256 * 240; i++)
+            {
+                _sprNameTables[0][i] = 0xFF000000;
+                _sprNameTables[1][i] = 0xFF000000;
+            }
+        }
+
+        public UInt32[] GetActiveFrame()
+        {
+            return _sprFrames[_activeFrame];
+        }
+
+        public UInt32[] GetPatternTable(int ix, byte palette)
+        {
+            for (var tileY = 0; tileY < 16; tileY++)
+            {
+                for(var tileX = 0; tileX < 16; tileX++)
+                {
+                    var offset = tileY * 256 + tileX * 16;
+                    for(var row = 0; row < 8; row++)
+                    {
+                        byte tileLsb = PpuRead((ushort)(ix * 0x1000 + offset + row + 0));
+                        byte tileMsb = PpuRead((ushort)(ix * 0x1000 + offset + row + 8));
+
+                        for (var col = 0; col < 8; col++)
+                        {
+                            byte pixel = (byte)((tileLsb & 0x01) + (tileMsb & 0x01));
+                            tileLsb = (byte)(tileLsb >> 1);
+                            tileMsb = (byte)(tileMsb >> 1);
+
+                            var x = tileX * 8 + (7 - col);
+                            var y = tileY * 8 + row;
+
+                            var pixelAddress = (128 * y) + x;
+                            _sprPatternTables[ix][pixelAddress] = GetColorFromPaletteRam(palette, pixel).ToUInt32();
+                        }
+                    }
+                }
+            }
+            return _sprPatternTables[ix];
+        }
+
+        private NesPixel GetColorFromPaletteRam(byte palette, byte pixel)
+        {
+            var address = (ushort)(0x3F00 + (palette << 2) + pixel);
+            var paletteId = PpuRead(address);
+            return _palScreen[paletteId & 0x3F];
+        }
+
+        public UInt32[] GetNameTable(int ix)
+        {
+            return _sprNameTables[ix];
+        }
 
         public void CpuWrite(ushort address, byte data) 
         {
             switch (address)
             {
                 case 0x0000: // Control
+                    _ctrlRegister.Set(data);
                     break;
                 case 0x0001: // Mask
+                    _maskRegister.Set(data);
                     break;
                 case 0x0002: // Status
                     break;
@@ -161,8 +207,20 @@ namespace Nessie
                 case 0x0005: // Scroll
                     break;
                 case 0x0006: // PPU Address
+                    if (_addressLatch == 0)
+                    {
+                        _ppuAddress = (ushort)((_ppuAddress & 0x00FF) | (data << 8));
+                        _addressLatch = 1;
+                    }
+                    else
+                    {
+                        _ppuAddress = (ushort)((_ppuAddress & 0xFF00) | data);
+                        _addressLatch = 0;
+                    }
                     break;
                 case 0x0007: // PPU Data
+                    PpuWrite(_ppuAddress, data);
+                    _ppuAddress = (ushort)(_ppuAddress + (_ctrlRegister.I ? 32 : 1));
                     break;
             }
         }
@@ -177,6 +235,10 @@ namespace Nessie
                 case 0x0001: // Mask
                     break;
                 case 0x0002: // Status
+                    _statusRegister.VerticalBlank = true;
+                    data = (byte)((_statusRegister.Get() & 0xE0) | (_statusRegister.Get() & 0x1F));
+                    _statusRegister.VerticalBlank = false;
+                    _addressLatch = 0;
                     break;
                 case 0x0003: // OEM Address
                     break;
@@ -187,11 +249,19 @@ namespace Nessie
                 case 0x0006: // PPU Address
                     break;
                 case 0x0007: // PPU Data
+                    data = _ppuDataBuffer;
+                    _ppuDataBuffer = PpuRead(_ppuAddress);
+                    if (_ppuAddress >= 0x3F00) data = _ppuDataBuffer;
+                    _ppuAddress = (ushort)(_ppuAddress + (_ctrlRegister.I ? 32 : 1));
                     break;
             }
 
             return data;
         }
+
+        private byte _addressLatch = 0x00;
+        private byte _ppuDataBuffer = 0x00;
+        private ushort _ppuAddress = 0x0000;
 
         public void PpuWrite(ushort address, byte data) 
         {
@@ -200,6 +270,23 @@ namespace Nessie
             if (_cartridge.PpuWrite(address, data))
             {
                 return;
+            }
+            else if (address >= 0x0000 && address <= 0x1FFF)
+            {
+                _tblPattern[(byte)((address & 0x1000) >> 12)][(ushort)(address & 0x0FFF)] = data;
+            }
+            else if (address >= 0x2000 && address <= 0x3EFF)
+            {
+
+            }
+            else if (address >= 0x3F00 && address <= 0x3FFF)
+            {
+                address = (ushort)(address & 0x001F);
+                if (address == 0x0010) address = 0x0000;
+                if (address == 0x0014) address = 0x0004;
+                if (address == 0x0018) address = 0x0008;
+                if (address == 0x001C) address = 0x000C;
+                _tblPalette[address] = data;
             }
         }
 
@@ -211,6 +298,23 @@ namespace Nessie
             if (_cartridge.PpuRead(address, ref data))
             {
                 return data;
+            }
+            else if (address >= 0x0000 && address <= 0x1FFF)
+            {
+                data = _tblPattern[(byte)((address & 0x1000) >> 12)][(ushort)(address & 0x0FFF)];
+            } 
+            else if (address >= 0x2000 && address <= 0x3EFF)
+            {
+
+            } 
+            else if (address >= 0x3F00 && address <= 0x3FFF)
+            {
+                address = (ushort)(address & 0x001F);
+                if (address == 0x0010) address = 0x0000;
+                if (address == 0x0014) address = 0x0004;
+                if (address == 0x0018) address = 0x0008;
+                if (address == 0x001C) address = 0x000C;
+                data = _tblPalette[address];
             }
 
             return data;
@@ -224,9 +328,10 @@ namespace Nessie
         public void Clock() 
         {
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
-            _frames[frameIx][_cycle + ((_scanline + 1) * 341)] = _palScreen[rnd.Next(0x40)].ToUInt32();
-            //_frames[frameIx][_cycle + ((_scanline + 1) * 341)] = 0xFFFF0000;
-
+            if (_cycle <= 256 && _scanline <= 240)
+            {
+                _sprFrames[frameIx][_cycle + ((_scanline + 1) * 341)] = _palScreen[rnd.Next(0x40)].ToUInt32();
+            }
             _cycle++;
 
             if (_cycle >= 341)
@@ -240,6 +345,7 @@ namespace Nessie
                     _activeFrame = frameIx;
                 }
             }
+            _statusRegister.VerticalBlank = _scanline > 240;
         }
     }
 }
