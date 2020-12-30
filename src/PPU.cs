@@ -10,7 +10,7 @@ namespace Nessie
 
         private readonly Bus _bus;
         private Cartridge _cartridge;
-        private byte[] _tblName = new byte[2048];
+        private byte[][] _tblName = new byte[2][];
         private byte[] _tblPalette = new byte[32];
         private byte[][] _tblPattern = new byte[2][];
         private ushort _cycle;
@@ -51,6 +51,8 @@ namespace Nessie
             InitSprNameTables();
             _tblPattern[0] = new byte[4096];
             _tblPattern[1] = new byte[4096];
+            _tblName[0] = new byte[1024];
+            _tblName[1] = new byte[1024];
         }
 
         private void InitPalScreen()
@@ -207,10 +209,9 @@ namespace Nessie
         public byte[] GetNameTable(int ix)
         {
             var ret = new byte[1024];
-            var offset = ix * 1024;
             for(var i = 0; i < 1024; i++)
             {
-                ret[i] = _tblName[offset + i];
+                ret[i] = _tblName[ix][i];
             }
             return ret;
         }
@@ -341,38 +342,38 @@ namespace Nessie
                 {
                     if (address >= 0x0000 && address <= 0x03FF)
                     {
-                        _tblName[0 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[0][address & 0x03FF] = data;
                     }
                     if (address >= 0x0400 && address <= 0x07FF)
                     {
-                        _tblName[1 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[1][address & 0x03FF] = data;
                     }
                     if (address >= 0x0800 && address <= 0x0BFF)
                     {
-                        _tblName[0 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[0][address & 0x03FF] = data;
                     }
                     if (address >= 0x0C00 && address <= 0x0FFF)
                     {
-                        _tblName[1 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[1][address & 0x03FF] = data;
                     }
                 }
                 else if (_cartridge.Mirror == Mirror.Horizontal)
                 {
                     if (address >= 0x0000 && address <= 0x03FF)
                     {
-                        _tblName[0 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[0][address & 0x03FF] = data;
                     }
                     if (address >= 0x0400 && address <= 0x07FF)
                     {
-                        _tblName[0 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[0][address & 0x03FF] = data;
                     }
                     if (address >= 0x0800 && address <= 0x0BFF)
                     {
-                        _tblName[1 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[1][address & 0x03FF] = data;
                     }
                     if (address >= 0x0C00 && address <= 0x0FFF)
                     {
-                        _tblName[1 * 1024 + (address & 0x03FF)] = data;
+                        _tblName[1][address & 0x03FF] = data;
                     }
                 }
             }
@@ -408,38 +409,38 @@ namespace Nessie
                 {
                     if (address >= 0x0000 && address <= 0x03FF) 
                     {
-                        data = _tblName[0 * 1024 + (address & 0x03FF)];
+                        data = _tblName[0][address & 0x03FF];
                     }
                     if (address >= 0x0400 && address <= 0x07FF) 
                     {
-                        data = _tblName[1 * 1024 + (address & 0x03FF)];
+                        data = _tblName[1][address & 0x03FF];
                     }
                     if (address >= 0x0800 && address <= 0x0BFF) 
                     {
-                        data = _tblName[0 * 1024 + (address & 0x03FF)];
+                        data = _tblName[0][address & 0x03FF];
                     }
                     if (address >= 0x0C00 && address <= 0x0FFF) 
                     {
-                        data = _tblName[1 * 1024 + (address & 0x03FF)];
+                        data = _tblName[1][address & 0x03FF];
                     }
                 } 
                 else if (_cartridge.Mirror == Mirror.Horizontal)
                 {
                     if (address >= 0x0000 && address <= 0x03FF)
                     {
-                        data = _tblName[0 * 1024 + (address & 0x03FF)];
+                        data = _tblName[0][address & 0x03FF];
                     }
                     if (address >= 0x0400 && address <= 0x07FF)
                     {
-                        data = _tblName[0 * 1024 + (address & 0x03FF)];
+                        data = _tblName[0][address & 0x03FF];
                     }
                     if (address >= 0x0800 && address <= 0x0BFF)
                     {
-                        data = _tblName[1 * 1024 + (address & 0x03FF)];
+                        data = _tblName[1][address & 0x03FF];
                     }
                     if (address >= 0x0C00 && address <= 0x0FFF)
                     {
-                        data = _tblName[1 * 1024 + (address & 0x03FF)];
+                        data = _tblName[1][address & 0x03FF];
                     }
                 }
             } 
