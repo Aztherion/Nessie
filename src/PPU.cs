@@ -609,6 +609,13 @@ namespace Nessie
             }
 
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
+            if (bgPalette > 0)
+            {
+                if (Debugger.IsAttached)
+                {
+                    //Debugger.Break();
+                }
+            }
             _sprFrames[frameIx][_cycle + ((_scanline + 1) * 341)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
             
             _cycle++;

@@ -38,7 +38,7 @@ namespace Nessie
                 _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
             }
             _font = Content.Load<SpriteFont>("Font");
-            var cartridge = new Cartridge("Content/roms/nestest.nes");
+            var cartridge = new Cartridge("Content/roms/dk.nes");
             _nes.InsertCartridge(cartridge);
             _nes.Reset();
         }
