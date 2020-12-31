@@ -23,6 +23,8 @@ namespace Nessie
             _graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             _nes = new Bus();
+            _graphics.PreferredBackBufferWidth = 1024;
+            _graphics.PreferredBackBufferHeight = 768;
         }
 
         protected override void LoadContent()
@@ -254,22 +256,21 @@ namespace Nessie
             }
             */
             _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 256 * 240);
-            //_frameCanvas.SetData<UInt32>(data, 0, 341 * 261);
             _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, _palette), 0, 128 * 128);
             _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, _palette), 0, 128 * 128);
-            for(var i = 0; i < 8; i++)
+            for (var i = 0; i < 8; i++)
             {
                 _paletteCanvas[i].SetData<UInt32>(GetPaletteData((byte)i), 0, 10 * 40);
             }
 
             _spriteBatch.Begin();
-            _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 256, 240), Color.White);
-            _spriteBatch.Draw(_patternTableCanvas[0], new Rectangle(400, 300, 128, 128), Color.White);
-            _spriteBatch.Draw(_patternTableCanvas[1], new Rectangle(535, 300, 128, 128), Color.White);
-            
-            for(var i = 0; i < 8; i++)
+            _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 256 * 2, 240 * 2), Color.White);
+            _spriteBatch.Draw(_patternTableCanvas[0], new Rectangle(400, 520, 128, 128), Color.White);
+            _spriteBatch.Draw(_patternTableCanvas[1], new Rectangle(535, 520, 128, 128), Color.White);
+
+            for (var i = 0; i < 8; i++)
             {
-                _spriteBatch.Draw(_paletteCanvas[i], new Rectangle(400 + (i * 45), 440, 40, 10), Color.White);
+                _spriteBatch.Draw(_paletteCanvas[i], new Rectangle(400 + (i * 45), 500, 40, 10), Color.White);
             }
             _spriteBatch.DrawString(_font, $"A: 0x{_nes.Cpu.A:X}", new Vector2(10, 10), Color.Black);
             _spriteBatch.DrawString(_font, $"X: 0x{_nes.Cpu.X:X}", new Vector2(10, 30), Color.Black);
