@@ -30,19 +30,19 @@ namespace Nessie
 
         private NesPixel[] _palScreen = new NesPixel[0x40];
 
-        private LoopyRegister vramAddr;
-        private LoopyRegister tramAddr;
+        private LoopyRegister _vramAddr;
+        private LoopyRegister _tramAddr;
 
         private byte fineX;
 
-        private byte bgNextTileId = 0x00;
-        private byte bgNextTileAttrib = 0x00;
-        private byte bgNextTileLsb = 0x00;
-        private byte bgNextTileMsb = 0x00;
-        private ushort bgShifterPatternLo = 0x0000;
-        private ushort bgShifterPatternHi = 0x0000;
-        private ushort bgShifterAttribLo = 0x0000;
-        private ushort bgShifterAttribHi = 0x0000;
+        private byte _bgNextTileId = 0x00;
+        private byte _bgNextTileAttrib = 0x00;
+        private byte _bgNextTileLsb = 0x00;
+        private byte _bgNextTileMsb = 0x00;
+        private ushort _bgShifterPatternLo = 0x0000;
+        private ushort _bgShifterPatternHi = 0x0000;
+        private ushort _bgShifterAttribLo = 0x0000;
+        private ushort _bgShifterAttribHi = 0x0000;
 
         private byte _addressLatch = 0x00;
         private byte _ppuDataBuffer = 0x00;
@@ -258,9 +258,9 @@ namespace Nessie
                     break;
                 case 0x0007: // PPU Data
                     data = _ppuDataBuffer;
-                    _ppuDataBuffer = PpuRead(vramAddr.Reg);
-                    if (vramAddr.Reg >= 0x3F00) data = _ppuDataBuffer;
-                    vramAddr.Reg = (ushort)(vramAddr.Reg + (_ctrlRegister.I ? 32 : 1));
+                    _ppuDataBuffer = PpuRead(_vramAddr.Reg);
+                    if (_vramAddr.Reg >= 0x3F00) data = _ppuDataBuffer;
+                    _vramAddr.Reg = (ushort)(_vramAddr.Reg + (_ctrlRegister.I ? 0x20 : 1));
                     break;
             }
 
@@ -273,8 +273,8 @@ namespace Nessie
             {
                 case 0x0000: // Control
                     _ctrlRegister.Set(data);
-                    tramAddr.NameTableX = _ctrlRegister.NameTableX;
-                    tramAddr.NameTableY = _ctrlRegister.NameTableY;
+                    _tramAddr.NameTableX = _ctrlRegister.NameTableX;
+                    _tramAddr.NameTableY = _ctrlRegister.NameTableY;
                     break;
                 case 0x0001: // Mask
                     _maskRegister.Set(data);
@@ -289,35 +289,35 @@ namespace Nessie
                     if (_addressLatch == 0)
                     {
                         fineX = (byte)(data & 0x07);
-                        tramAddr.CoarseX = (byte)(data >> 3);
+                        _tramAddr.CoarseX = (byte)((data >> 3) & 0x1F);
                         _addressLatch = 1;
                     } 
                     else
                     {
-                        tramAddr.FineY = (byte)(data & 0x7);
-                        tramAddr.CoarseY = (byte)(data >> 3);
+                        _tramAddr.FineY = (byte)(data & 0x7);
+                        _tramAddr.CoarseY = (byte)((data >> 3) & 0x1F);
                         _addressLatch = 0;
                     }
                     break;
                 case 0x0006: // PPU Address
                     if (_addressLatch == 0)
                     {
-                        ushort maskedReg = (ushort)(tramAddr.Reg & 0x00FF);
+                        ushort maskedReg = (ushort)(_tramAddr.Reg & 0x00FF);
                         ushort maskedData = (ushort)((data & 0x3F) << 8);
-                        tramAddr.Reg = (ushort)(maskedData | maskedReg);
+                        _tramAddr.Reg = (ushort)(maskedData | maskedReg);
                         _addressLatch = 1;
                     }
                     else
                     {
-                        ushort maskedReg = (ushort)(tramAddr.Reg & 0xFF00);
-                        tramAddr.Reg = (ushort)(maskedReg | data);
-                        vramAddr = tramAddr;
+                        ushort maskedReg = (ushort)(_tramAddr.Reg & 0xFF00);
+                        _tramAddr.Reg = (ushort)(maskedReg | data);
+                        _vramAddr.Set(_tramAddr.Get());
                         _addressLatch = 0;
                     }
                     break;
                 case 0x0007: // PPU Data
-                    PpuWrite(vramAddr.Reg, data);
-                    vramAddr.Reg = (ushort)(vramAddr.Reg + (_ctrlRegister.I ? 32 : 1));
+                    PpuWrite(_vramAddr.Reg, data);
+                    _vramAddr.Reg = (ushort)(_vramAddr.Reg + (_ctrlRegister.I ? 0x20 : 1));
                     break;
             }
         }
@@ -469,19 +469,19 @@ namespace Nessie
             _ppuDataBuffer = 0x00;
             _scanline = 0;
             _cycle = 0;
-            bgNextTileId = 0x00;
-            bgNextTileAttrib = 0x00;
-            bgNextTileLsb = 0x00;
-            bgNextTileMsb = 0x00;
-            bgShifterPatternLo = 0x0000;
-            bgShifterPatternHi = 0x0000;
-            bgShifterAttribLo = 0x00;
-            bgShifterAttribHi = 0x00;
+            _bgNextTileId = 0x00;
+            _bgNextTileAttrib = 0x00;
+            _bgNextTileLsb = 0x00;
+            _bgNextTileMsb = 0x00;
+            _bgShifterPatternLo = 0x0000;
+            _bgShifterPatternHi = 0x0000;
+            _bgShifterAttribLo = 0x00;
+            _bgShifterAttribHi = 0x00;
             _statusRegister.Set(0x00);
             _maskRegister.Set(0x00);
             _ctrlRegister.Set(0x00);
-            vramAddr.Reg = 0x0000;
-            tramAddr.Reg = 0x0000;
+            _vramAddr.Reg = 0x0000;
+            _tramAddr.Reg = 0x0000;
         }
 
         public void Clock() 
@@ -509,45 +509,40 @@ namespace Nessie
                     {
                         case 0:
                             LoadBackgroundShifters();
-                            var tileX = (ushort)(341 / (_cycle / 4));
-                            var tileY = (ushort)((_scanline/4) * 32);
-
-                            var tileAddress = (ushort)(tileX + tileY + vramAddr.Reg);
-                            //bgNextTileId = PpuRead((ushort)(0x2000 | (vramAddr.Reg & 0x0FFF)));
-                            bgNextTileId = PpuRead((ushort)(0x2000 | (tileAddress & 0x0FFF)));
+                            _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF)));
                             if (_performFrameDump)
                             {
                                 _tileIdFetchCount++;
-                                var sTileId = bgNextTileId.ToString("X").PadLeft(2, '0');
-                                var sAddress = ((ushort)(0x2000 | (tileAddress & 0x0FFF))).ToString("X").PadLeft(2, '0');
+                                var sTileId = _bgNextTileId.ToString("X").PadLeft(2, '0');
+                                var sAddress = ((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF))).ToString("X").PadLeft(2, '0');
 
                                 System.IO.File.AppendAllText(@"c:\tmp\framedump.txt", $"0x{sAddress}: 0x{sTileId}\r\n");
                             }
                             break;
                         case 2:
-                            ushort nameTableY = (ushort)((vramAddr.NameTableY ? 1 : 0) << 11);
-                            ushort nameTableX = (ushort)((vramAddr.NameTableX ? 1 : 0) << 10);
-                            ushort coarseY = (ushort)((vramAddr.CoarseY >> 2) << 3);
-                            ushort coarseX = (ushort)(vramAddr.CoarseX >> 2);
+                            ushort nameTableY = (ushort)((_vramAddr.NameTableY ? 1 : 0) << 11);
+                            ushort nameTableX = (ushort)((_vramAddr.NameTableX ? 1 : 0) << 10);
+                            ushort coarseY = (ushort)((_vramAddr.CoarseY >> 2) << 3);
+                            ushort coarseX = (ushort)(_vramAddr.CoarseX >> 2);
                             ushort ppuReadAddress = (ushort)(0x23C0 | nameTableY | nameTableX | coarseY | coarseX);
-                            bgNextTileAttrib = PpuRead(ppuReadAddress);
-                            if ((vramAddr.CoarseY & 0x02) > 0) bgNextTileAttrib = (byte)(bgNextTileAttrib >> 4);
-                            if ((vramAddr.CoarseX & 0x02) > 0) bgNextTileAttrib = (byte)(bgNextTileAttrib >> 2);
-                            bgNextTileAttrib = (byte)(bgNextTileAttrib & 0x03);
+                            _bgNextTileAttrib = PpuRead(ppuReadAddress);
+                            if ((_vramAddr.CoarseY & 0x02) > 0) _bgNextTileAttrib = (byte)(_bgNextTileAttrib >> 4);
+                            if ((_vramAddr.CoarseX & 0x02) > 0) _bgNextTileAttrib = (byte)(_bgNextTileAttrib >> 2);
+                            _bgNextTileAttrib = (byte)(_bgNextTileAttrib & 0x03);
                             break;
                         case 4:
                             patternBackground = (ushort)((_ctrlRegister.B ? 1 : 0) << 12);
-                            nextTileId = (ushort)(bgNextTileId << 4);
-                            fineY = (ushort)(vramAddr.FineY + 0);
+                            nextTileId = (ushort)(_bgNextTileId << 4);
+                            fineY = (ushort)(_vramAddr.FineY + 0);
                             address = (ushort)(patternBackground + nextTileId + fineY);
-                            bgNextTileLsb = PpuRead(address);
+                            _bgNextTileLsb = PpuRead(address);
                             break;
                         case 6:
                             patternBackground = (ushort)((_ctrlRegister.B ? 1 : 0) << 12);
-                            nextTileId = (ushort)(bgNextTileId << 4);
-                            fineY = (ushort)(vramAddr.FineY + 8);
+                            nextTileId = (ushort)(_bgNextTileId << 4);
+                            fineY = (ushort)(_vramAddr.FineY + 8);
                             address = (ushort)(patternBackground + nextTileId + fineY);
-                            bgNextTileMsb = PpuRead(address);
+                            _bgNextTileMsb = PpuRead(address);
                             break;
                         case 7:
                             IncScrollX();
@@ -569,7 +564,7 @@ namespace Nessie
 
                 if (_cycle == 338 || _cycle == 340)
                 {
-                    bgNextTileId = PpuRead((ushort)(0x2000 | (vramAddr.Reg & 0x0FFF)));
+                    _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF)));
                 }
 
                 if (_scanline == -1 && _cycle >= 280 && _cycle < 305)
@@ -602,29 +597,20 @@ namespace Nessie
             {
                 ushort mux = (ushort)(0x8000 >> fineX);
 
-                byte p0Pixel = (byte)((bgShifterPatternLo & mux) > 0 ? 1 : 0);
-                byte p1Pixel = (byte)((bgShifterPatternHi & mux) > 0 ? 1 : 0);
+                byte p0Pixel = (byte)((_bgShifterPatternLo & mux) > 0 ? 1 : 0);
+                byte p1Pixel = (byte)((_bgShifterPatternHi & mux) > 0 ? 1 : 0);
 
                 bgPixel = (byte)((p1Pixel << 1) | p0Pixel);
 
-                byte pal0 = (byte)((bgShifterAttribLo & mux) > 0 ? 1 : 0);
-                byte pal1 = (byte)((bgShifterAttribHi & mux) > 0 ? 1 : 0);
+                byte pal0 = (byte)((_bgShifterAttribLo & mux) > 0 ? 1 : 0);
+                byte pal1 = (byte)((_bgShifterAttribHi & mux) > 0 ? 1 : 0);
 
                 bgPalette = (byte)((pal1 << 1) | pal0);                
             }
 
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
-            _sprFrames[frameIx][_cycle+ ((_scanline + 1) * 341)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
-
-            /*
-            var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
-            */
-            /*
-            if (_cycle <= 256 && _scanline <= 240)
-            {
-                _sprFrames[frameIx][_cycle + ((_scanline + 1) * 341)] = _palScreen[rnd.Next(0x40)].ToUInt32();
-            }
-            */
+            _sprFrames[frameIx][_cycle + ((_scanline + 1) * 341)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
+            
             _cycle++;
             if (_cycle >= 341)
             {
@@ -654,14 +640,14 @@ namespace Nessie
         {
             if (_maskRegister.BackgroundEnable || _maskRegister.SpriteEnable)
             {
-                if (vramAddr.CoarseX == 31)
+                if (_vramAddr.CoarseX == 31)
                 {
-                    vramAddr.CoarseX = (byte)0;
-                    vramAddr.NameTableX = !vramAddr.NameTableX;
+                    _vramAddr.CoarseX = (byte)0;
+                    _vramAddr.NameTableX = !_vramAddr.NameTableX;
                 } 
                 else
                 {
-                    vramAddr.CoarseX = (byte)(vramAddr.CoarseX + 1);
+                    _vramAddr.CoarseX = (byte)(_vramAddr.CoarseX + 1);
                 }
             }
         }
@@ -670,23 +656,23 @@ namespace Nessie
         {
             if (_maskRegister.BackgroundEnable || _maskRegister.SpriteEnable)
             {
-                if (vramAddr.FineY < 7)
+                if (_vramAddr.FineY < 7)
                 {
-                    vramAddr.FineY = (byte)(vramAddr.FineY++);
+                    _vramAddr.FineY = (byte)(_vramAddr.FineY + 1);
                 } else
                 {
-                    vramAddr.FineY = 0;
+                    _vramAddr.FineY = 0;
 
-                    if (vramAddr.CoarseY == 29)
+                    if (_vramAddr.CoarseY == 29)
                     {
-                        vramAddr.CoarseY = 0;
-                        vramAddr.NameTableY = !vramAddr.NameTableY;
-                    } else if (vramAddr.CoarseY == 31)
+                        _vramAddr.CoarseY = 0;
+                        _vramAddr.NameTableY = !_vramAddr.NameTableY;
+                    } else if (_vramAddr.CoarseY == 31)
                     {
-                        vramAddr.CoarseY = 0;
+                        _vramAddr.CoarseY = 0;
                     } else
                     {
-                        vramAddr.CoarseY = (byte)(vramAddr.CoarseY + 1);
+                        _vramAddr.CoarseY = (byte)(_vramAddr.CoarseY + 1);
                     }
                 }
             }
@@ -696,8 +682,8 @@ namespace Nessie
         {
             if (_maskRegister.BackgroundEnable || _maskRegister.SpriteEnable)
             {
-                vramAddr.NameTableX = tramAddr.NameTableX;
-                vramAddr.CoarseX = tramAddr.CoarseX;
+                _vramAddr.NameTableX = _tramAddr.NameTableX;
+                _vramAddr.CoarseX = _tramAddr.CoarseX;
             }
         }
 
@@ -705,31 +691,31 @@ namespace Nessie
         {
             if (_maskRegister.BackgroundEnable || _maskRegister.SpriteEnable)
             {
-                vramAddr.FineY = tramAddr.FineY;
-                vramAddr.NameTableY = tramAddr.NameTableY;
-                vramAddr.CoarseY = tramAddr.CoarseY;
+                _vramAddr.FineY = _tramAddr.FineY;
+                _vramAddr.NameTableY = _tramAddr.NameTableY;
+                _vramAddr.CoarseY = _tramAddr.CoarseY;
             }
         }
 
         private void LoadBackgroundShifters()
         {
 
-            bgShifterPatternLo = (ushort)((bgShifterPatternLo & 0xFF00) | bgNextTileLsb);
-            bgShifterPatternHi = (ushort)((bgShifterPatternHi & 0xFF00) | bgNextTileMsb);
+            _bgShifterPatternLo = (ushort)((_bgShifterPatternLo & 0xFF00) | _bgNextTileLsb);
+            _bgShifterPatternHi = (ushort)((_bgShifterPatternHi & 0xFF00) | _bgNextTileMsb);
 
-            bgShifterAttribLo = (ushort)((bgShifterAttribLo & 0xFF00) | ((bgNextTileAttrib & 0x1) > 0 ? 0xFF : 0x00));
-            bgShifterAttribHi = (ushort)((bgShifterAttribHi & 0xFF00) | ((bgNextTileAttrib & 0x2) > 0 ? 0xFF : 0x00));
+            _bgShifterAttribLo = (ushort)((_bgShifterAttribLo & 0xFF00) | ((_bgNextTileAttrib & 0x1) > 0 ? 0xFF : 0x00));
+            _bgShifterAttribHi = (ushort)((_bgShifterAttribHi & 0xFF00) | ((_bgNextTileAttrib & 0x2) > 0 ? 0xFF : 0x00));
         }
 
         private void UpdateShifters()
         {
             if (_maskRegister.BackgroundEnable)
             {
-                bgShifterPatternLo = (ushort)(bgShifterPatternLo << 1);
-                bgShifterPatternHi = (ushort)(bgShifterPatternHi << 1);
+                _bgShifterPatternLo = (ushort)(_bgShifterPatternLo << 1);
+                _bgShifterPatternHi = (ushort)(_bgShifterPatternHi << 1);
 
-                bgShifterAttribLo = (ushort)(bgShifterAttribLo << 1);
-                bgShifterAttribHi = (ushort)(bgShifterAttribHi << 1);
+                _bgShifterAttribLo = (ushort)(_bgShifterAttribLo << 1);
+                _bgShifterAttribHi = (ushort)(_bgShifterAttribHi << 1);
 
             }
         }

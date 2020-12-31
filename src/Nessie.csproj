@@ -63,6 +63,7 @@
     <Compile Include="CPU.cs" />
     <Compile Include="LoopyRegister.cs" />
     <Compile Include="Mapper.cs" />
+    <Compile Include="Mapper_000.cs" />
     <Compile Include="NesGame.cs" />
     <Compile Include="NesPixel.cs" />
     <Compile Include="PPU.cs" />

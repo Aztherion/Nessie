@@ -1,4 +1,6 @@
-﻿namespace Nessie
+﻿using System;
+
+namespace Nessie
 {
     class Program
     {

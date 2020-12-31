@@ -16,6 +16,7 @@
         public byte Get()
         {
             byte b = 0;
+
             b = (byte)(VerticalBlank ? 1 : 0);
             b = (byte)(b << 1);
             b += (byte)(SpriteZeroHit ? 1 : 0);
