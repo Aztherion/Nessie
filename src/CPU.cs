@@ -23,7 +23,7 @@ namespace Nessie
         private Bus Bus;
         private int Cycles;
         private long InstructionCount = 1;
-        private bool OutputToConsole = true;
+        private bool OutputToConsole = false;
         public CPU()
         {
             InitializeInstructionTable();
@@ -48,7 +48,7 @@ namespace Nessie
         {
             SP = 0xFD;
             PC = ReadWord(ResetVector);
-            PC = 0xC000;
+            //PC = 0xC000;
             A = 0;
             X = 0;
             Y = 0;
