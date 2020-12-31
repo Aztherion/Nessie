@@ -72,7 +72,10 @@ namespace Nessie
 
         public void Reset() 
         {
+
+            _cartridge.Reset();
             Cpu.Reset();
+            Ppu.Reset();
             SystemClockCounter = 0;
         }
 

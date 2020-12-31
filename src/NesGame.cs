@@ -38,7 +38,7 @@ namespace Nessie
                 _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
             }
             _font = Content.Load<SpriteFont>("Font");
-            var cartridge = new Cartridge("Content/roms/dk.nes");
+            var cartridge = new Cartridge("Content/roms/nestest.nes");
             _nes.InsertCartridge(cartridge);
             _nes.Reset();
         }
@@ -98,6 +98,15 @@ namespace Nessie
             else if (Keyboard.GetState().IsKeyUp(Keys.E) && downKeys.Contains(Keys.E))
             {
                 downKeys.Remove(Keys.E);
+            }
+
+            if (Keyboard.GetState().IsKeyDown(Keys.D) && !downKeys.Contains(Keys.D))
+            {
+                downKeys.Add(Keys.D);
+                _nes.Ppu.RequestFrameDump = true;
+            } else if(Keyboard.GetState().IsKeyUp(Keys.D) && downKeys.Contains(Keys.D))
+            {
+                downKeys.Remove(Keys.D);
             }
 
             if (Keyboard.GetState().IsKeyDown(Keys.Space) && !downKeys.Contains(Keys.Space))
@@ -211,7 +220,7 @@ namespace Nessie
             sw.Restart();
             sw.Start();
             GraphicsDevice.Clear(Color.CornflowerBlue);
-
+            /*
             // HACK! only used for debugging purposes. 
             var patternTable = _nes.Ppu.GetPatternTable(1, _palette);
             var data = new UInt32[341 * 261];
@@ -243,9 +252,9 @@ namespace Nessie
 
                 }
             }
-
-            //_frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
-            _frameCanvas.SetData<UInt32>(data, 0, 341 * 261);
+            */
+            _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
+            //_frameCanvas.SetData<UInt32>(data, 0, 341 * 261);
             _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, _palette), 0, 128 * 128);
             _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, _palette), 0, 128 * 128);
             for(var i = 0; i < 8; i++)

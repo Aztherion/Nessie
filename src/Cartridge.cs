@@ -65,6 +65,14 @@ namespace Nessie
             return false;
         }
 
+        public void Reset()
+        {
+            if (_mapper != null)
+            {
+                _mapper.Reset();
+            }
+        }
+
         private void Load(string filename)
         {
             using (var fs = new FileStream(filename, FileMode.Open, FileAccess.Read))

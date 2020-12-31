@@ -23,7 +23,7 @@ namespace Nessie
         private Bus Bus;
         private int Cycles;
         private long InstructionCount = 1;
-        private bool OutputToConsole = false;
+        private bool OutputToConsole = true;
         public CPU()
         {
             InitializeInstructionTable();
@@ -48,7 +48,7 @@ namespace Nessie
         {
             SP = 0xFD;
             PC = ReadWord(ResetVector);
-            //PC = 0xC000;
+            PC = 0xC000;
             A = 0;
             X = 0;
             Y = 0;
@@ -360,7 +360,7 @@ namespace Nessie
                 var sp = SP.ToString("X");
                 var p = P.Get().ToString("X");
                 InstructionCount++;
-                if (InstructionCount == 8990)
+                if (InstructionCount == 8993)
                 {
                     if (Debugger.IsAttached)
                     {
@@ -635,7 +635,7 @@ namespace Nessie
 
         private void STA_ABS_X()
         {
-            var address = GetAbsoluteIndexedAddress(X);
+            var address = GetAbsoluteIndexedAddress(X, true);
             WriteByte(address, A);
             CurrentInstruction = $"STA_ABS_X ${A:X}";
             Cycles += 5;
@@ -662,7 +662,7 @@ namespace Nessie
             var address = GetIndirectIndexedAddress(true);
             WriteByte(address, A);
             CurrentInstruction = $"STA_IND_Y ${A:X}";
-            Cycles += 6;
+            Cycles += 5;
         }
 
         private void STX_ZP()
@@ -732,7 +732,7 @@ namespace Nessie
             X = A;
             SetNZFlags(A);
             CurrentInstruction = $"LAX_ZPY ${A:X}";
-            Cycles += 5;
+            Cycles += 4;
         }
 
         private void LAX_ABS()
@@ -1338,6 +1338,7 @@ namespace Nessie
             A = result;
             CurrentInstruction = $"SBC_ABS_X ${A:X}";
             SetNZFlags(A);
+            Cycles += 4;
         }
 
         private void SBC_ABS_Y()
@@ -1602,7 +1603,7 @@ namespace Nessie
             var result = (byte)(A - value);
             P.N = IsBitSet(result, 7);
             CurrentInstruction = $"DCP_ZP ${value:X}";
-            Cycles += 7;
+            Cycles = 7;
         }
 
         private void DCP_ABS_X()
@@ -1616,7 +1617,7 @@ namespace Nessie
             var result = (byte)(A - value);
             P.N = IsBitSet(result, 7);
             CurrentInstruction = $"DCP_ZP ${value:X}";
-            Cycles += 7;
+            Cycles = 7;
         }
 
         private void DCP_IND_X()
@@ -1630,7 +1631,7 @@ namespace Nessie
             var result = (byte)(A - value);
             P.N = IsBitSet(result, 7);
             CurrentInstruction = $"DCP_IND_X ${value:X}";
-            Cycles += 6;
+            Cycles += 8;
         }
         private void DCP_IND_Y()
         {
@@ -1643,7 +1644,7 @@ namespace Nessie
             var result = (byte)(A - value);
             P.N = IsBitSet(result, 7);
             CurrentInstruction = $"DCP_IND_X ${value:X}";
-            Cycles += 8;
+            Cycles = 8;
         }
         #endregion
 
@@ -1757,7 +1758,7 @@ namespace Nessie
             A = result;
             CurrentInstruction = $"ISB_ABS_X ${A:X}";
             SetNZFlags(A);
-            Cycles += 7;
+            Cycles = 7;
         }
 
         private void ISB_ABS_Y() 
@@ -1774,7 +1775,7 @@ namespace Nessie
             A = result;
             CurrentInstruction = $"ISB_ABS_Y ${A:X}";
             SetNZFlags(A);
-            Cycles += 7;
+            Cycles = 7;
         }
 
         private void ISB_IND_X() 
@@ -1808,7 +1809,7 @@ namespace Nessie
             A = result;
             CurrentInstruction = $"ISB_IND_Y ${A:X}";
             SetNZFlags(A);
-            Cycles += 8;
+            Cycles = 8;
         }
 
         private void INX()
@@ -1995,7 +1996,7 @@ namespace Nessie
             A = (byte)(A | value);
             CurrentInstruction = $"SLO_ABS_X ${A:X}";
             SetNZFlags(A);
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void SLO_ABS_Y() 
@@ -2008,7 +2009,7 @@ namespace Nessie
             A = (byte)(A | value);
             CurrentInstruction = $"SLO_ABS_Y ${A:X}";
             SetNZFlags(A);
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void SLO_IND_X() 
@@ -2034,7 +2035,7 @@ namespace Nessie
             A = (byte)(A | value);
             CurrentInstruction = $"SLO_IND_Y ${A:X}";
             SetNZFlags(A);
-            Cycles += 8;
+            Cycles += 7;
         }
 
         private void LSR_ACC()
@@ -2206,7 +2207,7 @@ namespace Nessie
             A = (byte)(A & value);
             CurrentInstruction = $"RLA_ABS_X ${A:X}";
             SetNZFlags(A);
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void RLA_ABS_Y() 
@@ -2221,7 +2222,7 @@ namespace Nessie
             A = (byte)(A & value);
             CurrentInstruction = $"RLA_ABS_Y ${A:X}";
             SetNZFlags(A);
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void RLA_IND_X() 
@@ -2251,7 +2252,7 @@ namespace Nessie
             A = (byte)(A & value);
             CurrentInstruction = $"RLA_IND_Y ${A:X}";
             SetNZFlags(A);
-            Cycles += 8;
+            Cycles += 7;
         }
 
         private void SRE_ZP() 
@@ -2307,7 +2308,7 @@ namespace Nessie
             A = (byte)(A ^ value);
             SetNZFlags(A);
             CurrentInstruction = $"SRE_ABS_X ${A:X}";
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void SRE_ABS_Y() 
@@ -2321,7 +2322,7 @@ namespace Nessie
             A = (byte)(A ^ value);
             SetNZFlags(A);
             CurrentInstruction = $"SRE_ABS_Y ${A:X}";
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void SRE_IND_X() 
@@ -2349,7 +2350,7 @@ namespace Nessie
             A = (byte)(A ^ value);
             SetNZFlags(A);
             CurrentInstruction = $"SRE_IND_Y ${A:X}";
-            Cycles += 8;
+            Cycles += 7;
         }
 
         private void RRA_ZP() 
@@ -2417,7 +2418,7 @@ namespace Nessie
             WriteByte(address, value);
             SetNZFlags(A);
             CurrentInstruction = $"RRA_ABS_X ${value:X}";
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void RRA_ABS_Y() 
@@ -2434,7 +2435,7 @@ namespace Nessie
             WriteByte(address, value);
             SetNZFlags(A);
             CurrentInstruction = $"RRA_ABS_Y ${value:X}";
-            Cycles += 7;
+            Cycles += 6;
         }
 
         private void RRA_IND_X() 
@@ -2468,7 +2469,7 @@ namespace Nessie
             WriteByte(address, value);
             SetNZFlags(A);
             CurrentInstruction = $"RRA_IND_Y ${value:X}";
-            Cycles += 8;
+            Cycles += 7;
         }
 
         private void ROL_ABS_X()
@@ -2871,7 +2872,7 @@ namespace Nessie
         {
             GetAbsoluteIndexedAddress(X); // throw away;
             CurrentInstruction = "IGN_ABS_X";
-            Cycles += 5;
+            Cycles += 4;
         }
 
         private void RTI()
@@ -2905,7 +2906,7 @@ namespace Nessie
         }
 
         // Absolute indexed addressing
-        private ushort GetAbsoluteIndexedAddress(byte register)
+        private ushort GetAbsoluteIndexedAddress(byte register, bool ignoreExtraCycle = false)
         {
             /*     Read instructions (LDA, LDX, LDY, EOR, AND, ORA, ADC, SBC, CMP, BIT,
                                     LAX, LAE, SHS, NOP)
@@ -2933,7 +2934,10 @@ namespace Nessie
             var zpHigh = ReadByte();
             var low = (byte)(zpLow + register % 0x100);
             var carry = (byte)((zpLow + register) / 0x100);
-            Cycles += carry;
+            if (!ignoreExtraCycle)
+            {
+                Cycles += carry;
+            }
             byte high = (byte)(zpHigh + carry);
             ushort effectiveAdr = high;
             effectiveAdr = (ushort)(effectiveAdr << 8);

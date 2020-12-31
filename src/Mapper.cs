@@ -36,6 +36,8 @@ namespace Nessie
         {
             return false;
         }
+
+        public virtual void Reset() { }
     }
 
     public class Mapper_000 : Mapper
@@ -84,6 +86,11 @@ namespace Nessie
                 }
             }
             return false;
+        }
+
+        public override void Reset()
+        {
+            
         }
     }
 }

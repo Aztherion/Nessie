@@ -61,6 +61,7 @@
     <Compile Include="Bus.cs" />
     <Compile Include="Cartridge.cs" />
     <Compile Include="CPU.cs" />
+    <Compile Include="LoopyRegister.cs" />
     <Compile Include="Mapper.cs" />
     <Compile Include="NesGame.cs" />
     <Compile Include="NesPixel.cs" />

@@ -11,10 +11,11 @@ namespace Nessie
         private readonly Bus _bus;
         private Cartridge _cartridge;
         private byte[][] _tblName = new byte[2][];
-        private byte[] _tblPalette = new byte[32];
         private byte[][] _tblPattern = new byte[2][];
+        private byte[] _tblPalette = new byte[32];
+        
         private ushort _cycle;
-        private short _scanline = -1;
+        private short _scanline;
 
         private PpuControlRegister _ctrlRegister;
         private PpuMaskRegister _maskRegister;
@@ -42,6 +43,12 @@ namespace Nessie
         private ushort bgShifterPatternHi = 0x0000;
         private ushort bgShifterAttribLo = 0x0000;
         private ushort bgShifterAttribHi = 0x0000;
+
+        private byte _addressLatch = 0x00;
+        private byte _ppuDataBuffer = 0x00;
+        public  bool RequestFrameDump { get; set; }
+        private bool _performFrameDump;
+        private int _tileIdFetchCount;
 
         public PPU() 
         {
@@ -227,76 +234,17 @@ namespace Nessie
             return ret;
         }
 
-        /*public UInt32[] GetNameTable(int ix)
-        {
-            return _sprNameTables[ix];
-        }*/
-
-        public void CpuWrite(ushort address, byte data) 
-        {
-            switch (address)
-            {
-                case 0x0000: // Control
-                    _ctrlRegister.Set(data);
-                    tramAddr.NameTableX = _ctrlRegister.NameTableX;
-                    tramAddr.NameTableY = _ctrlRegister.NameTableY;
-                    break;
-                case 0x0001: // Mask
-                    _maskRegister.Set(data);
-                    break;
-                case 0x0002: // Status
-                    break;
-                case 0x0003: // OEM Address
-                    break;
-                case 0x0004: // OEM Data
-                    break;
-                case 0x0005: // Scroll
-                    if (_addressLatch == 0)
-                    {
-                        fineX = (byte)(data & 0x7);
-                        tramAddr.CoarseX = (byte)((data >> 3) & 0x1F);
-                        _addressLatch = 1;
-                    } 
-                    else
-                    {
-                        tramAddr.FineY = (byte)(data & 0x7);
-                        tramAddr.CoarseY = (byte)((data >> 3) & 0x1F);
-                        _addressLatch = 0;
-                    }
-                    break;
-                case 0x0006: // PPU Address
-                    if (_addressLatch == 0)
-                    {
-                        tramAddr.Reg = (ushort)((tramAddr.Reg & 0x00FF) | ((data & 0x3F) << 8));
-                        _addressLatch = 1;
-                    }
-                    else
-                    {
-                        tramAddr.Reg = (ushort)((tramAddr.Reg & 0xFF00) | data);
-                        vramAddr = tramAddr;
-                        _addressLatch = 0;
-                    }
-                    break;
-                case 0x0007: // PPU Data
-                    PpuWrite(vramAddr.Reg, data);
-                    vramAddr.Reg = (ushort)(vramAddr.Reg + (_ctrlRegister.I ? 32 : 1));
-                    break;
-            }
-        }
-
-        public byte CpuRead(ushort address) 
+        public byte CpuRead(ushort address)
         {
             byte data = 0x0;
             switch (address)
             {
                 case 0x0000: // Control
-                    //data = _ctrlRegister.Get();
                     break;
                 case 0x0001: // Mask
-                    //data = _maskRegister.Get();
                     break;
                 case 0x0002: // Status
-                    data = (byte)((_statusRegister.Get() & 0xE0) | (_statusRegister.Get() & 0x1F));
+                    data = (byte)((_statusRegister.Get() & 0xE0) | (_ppuDataBuffer & 0x1F));
                     _statusRegister.VerticalBlank = false;
                     _addressLatch = 0;
                     break;
@@ -319,8 +267,129 @@ namespace Nessie
             return data;
         }
 
-        private byte _addressLatch = 0x00;
-        private byte _ppuDataBuffer = 0x00;
+        public void CpuWrite(ushort address, byte data) 
+        {
+            switch (address)
+            {
+                case 0x0000: // Control
+                    _ctrlRegister.Set(data);
+                    tramAddr.NameTableX = _ctrlRegister.NameTableX;
+                    tramAddr.NameTableY = _ctrlRegister.NameTableY;
+                    break;
+                case 0x0001: // Mask
+                    _maskRegister.Set(data);
+                    break;
+                case 0x0002: // Status
+                    break;
+                case 0x0003: // OEM Address
+                    break;
+                case 0x0004: // OEM Data
+                    break;
+                case 0x0005: // Scroll
+                    if (_addressLatch == 0)
+                    {
+                        fineX = (byte)(data & 0x07);
+                        tramAddr.CoarseX = (byte)(data >> 3);
+                        _addressLatch = 1;
+                    } 
+                    else
+                    {
+                        tramAddr.FineY = (byte)(data & 0x7);
+                        tramAddr.CoarseY = (byte)(data >> 3);
+                        _addressLatch = 0;
+                    }
+                    break;
+                case 0x0006: // PPU Address
+                    if (_addressLatch == 0)
+                    {
+                        ushort maskedReg = (ushort)(tramAddr.Reg & 0x00FF);
+                        ushort maskedData = (ushort)((data & 0x3F) << 8);
+                        tramAddr.Reg = (ushort)(maskedData | maskedReg);
+                        _addressLatch = 1;
+                    }
+                    else
+                    {
+                        ushort maskedReg = (ushort)(tramAddr.Reg & 0xFF00);
+                        tramAddr.Reg = (ushort)(maskedReg | data);
+                        vramAddr = tramAddr;
+                        _addressLatch = 0;
+                    }
+                    break;
+                case 0x0007: // PPU Data
+                    PpuWrite(vramAddr.Reg, data);
+                    vramAddr.Reg = (ushort)(vramAddr.Reg + (_ctrlRegister.I ? 32 : 1));
+                    break;
+            }
+        }
+
+        public byte PpuRead(ushort address)
+        {
+            byte data = 0x00;
+            address &= 0x3FFF;
+
+            if (_cartridge.PpuRead(address, ref data))
+            {
+                return data;
+            }
+            else if (address >= 0x0000 && address <= 0x1FFF)
+            {
+                data = _tblPattern[(byte)((address & 0x1000) >> 12)][(ushort)(address & 0x0FFF)];
+            }
+            else if (address >= 0x2000 && address <= 0x3EFF)
+            {
+                address = (ushort)(address & 0x0FFF);
+
+                if (_cartridge.Mirror == Mirror.Vertical)
+                {
+                    if (address >= 0x0000 && address <= 0x03FF)
+                    {
+                        data = _tblName[0][address & 0x03FF];
+                    }
+                    if (address >= 0x0400 && address <= 0x07FF)
+                    {
+                        data = _tblName[1][address & 0x03FF];
+                    }
+                    if (address >= 0x0800 && address <= 0x0BFF)
+                    {
+                        data = _tblName[0][address & 0x03FF];
+                    }
+                    if (address >= 0x0C00 && address <= 0x0FFF)
+                    {
+                        data = _tblName[1][address & 0x03FF];
+                    }
+                }
+                else if (_cartridge.Mirror == Mirror.Horizontal)
+                {
+                    if (address >= 0x0000 && address <= 0x03FF)
+                    {
+                        data = _tblName[0][address & 0x03FF];
+                    }
+                    if (address >= 0x0400 && address <= 0x07FF)
+                    {
+                        data = _tblName[0][address & 0x03FF];
+                    }
+                    if (address >= 0x0800 && address <= 0x0BFF)
+                    {
+                        data = _tblName[1][address & 0x03FF];
+                    }
+                    if (address >= 0x0C00 && address <= 0x0FFF)
+                    {
+                        data = _tblName[1][address & 0x03FF];
+                    }
+                }
+            }
+            else if (address >= 0x3F00 && address <= 0x3FFF)
+            {
+                address = (ushort)(address & 0x001F);
+                if (address == 0x0010) address = 0x0000;
+                if (address == 0x0014) address = 0x0004;
+                if (address == 0x0018) address = 0x0008;
+                if (address == 0x001C) address = 0x000C;
+                data = (byte)(_tblPalette[address] & (_maskRegister.Grayscale ? 0x30 : 0x3F));
+            }
+
+            return data;
+        }
 
         public void PpuWrite(ushort address, byte data) 
         {
@@ -388,78 +457,31 @@ namespace Nessie
             }
         }
 
-        public byte PpuRead(ushort address)
-        {
-            byte data = 0x00;
-            address &= 0x3FFF;
-
-            if (_cartridge.PpuRead(address, ref data))
-            {
-                return data;
-            }
-            else if (address >= 0x0000 && address <= 0x1FFF)
-            {
-                data = _tblPattern[(byte)((address & 0x1000) >> 12)][(ushort)(address & 0x0FFF)];
-            } 
-            else if (address >= 0x2000 && address <= 0x3EFF)
-            {
-                address = (ushort)(address & 0x0FFF);
-
-                if (_cartridge.Mirror == Mirror.Vertical)
-                {
-                    if (address >= 0x0000 && address <= 0x03FF) 
-                    {
-                        data = _tblName[0][address & 0x03FF];
-                    }
-                    if (address >= 0x0400 && address <= 0x07FF) 
-                    {
-                        data = _tblName[1][address & 0x03FF];
-                    }
-                    if (address >= 0x0800 && address <= 0x0BFF) 
-                    {
-                        data = _tblName[0][address & 0x03FF];
-                    }
-                    if (address >= 0x0C00 && address <= 0x0FFF) 
-                    {
-                        data = _tblName[1][address & 0x03FF];
-                    }
-                } 
-                else if (_cartridge.Mirror == Mirror.Horizontal)
-                {
-                    if (address >= 0x0000 && address <= 0x03FF)
-                    {
-                        data = _tblName[0][address & 0x03FF];
-                    }
-                    if (address >= 0x0400 && address <= 0x07FF)
-                    {
-                        data = _tblName[0][address & 0x03FF];
-                    }
-                    if (address >= 0x0800 && address <= 0x0BFF)
-                    {
-                        data = _tblName[1][address & 0x03FF];
-                    }
-                    if (address >= 0x0C00 && address <= 0x0FFF)
-                    {
-                        data = _tblName[1][address & 0x03FF];
-                    }
-                }
-            } 
-            else if (address >= 0x3F00 && address <= 0x3FFF)
-            {
-                address = (ushort)(address & 0x001F);
-                if (address == 0x0010) address = 0x0000;
-                if (address == 0x0014) address = 0x0004;
-                if (address == 0x0018) address = 0x0008;
-                if (address == 0x001C) address = 0x000C;
-                data = _tblPalette[address];
-            }
-
-            return data;
-        }
-
         public void ConnectCartridge(Cartridge cartridge)
         {
             _cartridge = cartridge;
+        }
+
+        public void Reset()
+        {
+            fineX = 0x00;
+            _addressLatch = 0x00;
+            _ppuDataBuffer = 0x00;
+            _scanline = 0;
+            _cycle = 0;
+            bgNextTileId = 0x00;
+            bgNextTileAttrib = 0x00;
+            bgNextTileLsb = 0x00;
+            bgNextTileMsb = 0x00;
+            bgShifterPatternLo = 0x0000;
+            bgShifterPatternHi = 0x0000;
+            bgShifterAttribLo = 0x00;
+            bgShifterAttribHi = 0x00;
+            _statusRegister.Set(0x00);
+            _maskRegister.Set(0x00);
+            _ctrlRegister.Set(0x00);
+            vramAddr.Reg = 0x0000;
+            tramAddr.Reg = 0x0000;
         }
 
         public void Clock() 
@@ -487,14 +509,28 @@ namespace Nessie
                     {
                         case 0:
                             LoadBackgroundShifters();
-                            bgNextTileId = PpuRead((ushort)(0x2000 | (vramAddr.Reg & 0x0FFF)));
+                            var tileX = (ushort)(341 / (_cycle / 4));
+                            var tileY = (ushort)((_scanline/4) * 32);
+
+                            var tileAddress = (ushort)(tileX + tileY + vramAddr.Reg);
+                            //bgNextTileId = PpuRead((ushort)(0x2000 | (vramAddr.Reg & 0x0FFF)));
+                            bgNextTileId = PpuRead((ushort)(0x2000 | (tileAddress & 0x0FFF)));
+                            if (_performFrameDump)
+                            {
+                                _tileIdFetchCount++;
+                                var sTileId = bgNextTileId.ToString("X").PadLeft(2, '0');
+                                var sAddress = ((ushort)(0x2000 | (tileAddress & 0x0FFF))).ToString("X").PadLeft(2, '0');
+
+                                System.IO.File.AppendAllText(@"c:\tmp\framedump.txt", $"0x{sAddress}: 0x{sTileId}\r\n");
+                            }
                             break;
                         case 2:
                             ushort nameTableY = (ushort)((vramAddr.NameTableY ? 1 : 0) << 11);
                             ushort nameTableX = (ushort)((vramAddr.NameTableX ? 1 : 0) << 10);
                             ushort coarseY = (ushort)((vramAddr.CoarseY >> 2) << 3);
                             ushort coarseX = (ushort)(vramAddr.CoarseX >> 2);
-                            bgNextTileAttrib = PpuRead((ushort)(0x23C0 | nameTableY | nameTableX | coarseY | coarseX));
+                            ushort ppuReadAddress = (ushort)(0x23C0 | nameTableY | nameTableX | coarseY | coarseX);
+                            bgNextTileAttrib = PpuRead(ppuReadAddress);
                             if ((vramAddr.CoarseY & 0x02) > 0) bgNextTileAttrib = (byte)(bgNextTileAttrib >> 4);
                             if ((vramAddr.CoarseX & 0x02) > 0) bgNextTileAttrib = (byte)(bgNextTileAttrib >> 2);
                             bgNextTileAttrib = (byte)(bgNextTileAttrib & 0x03);
@@ -578,7 +614,7 @@ namespace Nessie
             }
 
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
-            _sprFrames[frameIx][_cycle + ((_scanline + 1) * 341)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
+            _sprFrames[frameIx][_cycle+ ((_scanline + 1) * 341)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
 
             /*
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
@@ -599,6 +635,17 @@ namespace Nessie
                     _scanline = -1;
                     FrameComplete = true;
                     _activeFrame = frameIx;
+                    if (_performFrameDump)
+                    {
+                        _performFrameDump = false;
+                        Console.WriteLine(_tileIdFetchCount);
+                    }
+                    if (RequestFrameDump)
+                    {
+                        RequestFrameDump = false;
+                        _performFrameDump = true;
+                        _tileIdFetchCount = 0;
+                    }
                 }
             }
         }
@@ -670,8 +717,8 @@ namespace Nessie
             bgShifterPatternLo = (ushort)((bgShifterPatternLo & 0xFF00) | bgNextTileLsb);
             bgShifterPatternHi = (ushort)((bgShifterPatternHi & 0xFF00) | bgNextTileMsb);
 
-            bgShifterAttribLo = (ushort)((bgShifterAttribLo & 0xFF00) | ((bgNextTileAttrib & 0b01) > 0 ? 0xFF : 0x00));
-            bgShifterAttribHi = (ushort)((bgShifterAttribHi & 0xFF00) | ((bgNextTileAttrib & 0b10) > 0 ? 0xFF : 0x00));
+            bgShifterAttribLo = (ushort)((bgShifterAttribLo & 0xFF00) | ((bgNextTileAttrib & 0x1) > 0 ? 0xFF : 0x00));
+            bgShifterAttribHi = (ushort)((bgShifterAttribHi & 0xFF00) | ((bgNextTileAttrib & 0x2) > 0 ? 0xFF : 0x00));
         }
 
         private void UpdateShifters()
@@ -685,47 +732,6 @@ namespace Nessie
                 bgShifterAttribHi = (ushort)(bgShifterAttribHi << 1);
 
             }
-        }
-    }
-
-    public struct LoopyRegister
-    {
-        // Loopy Rox!
-        public byte CoarseX;
-        public byte CoarseY;
-        public bool NameTableX;
-        public bool NameTableY;
-        public byte FineY;
-        public ushort Reg;
-
-        public ushort Get()
-        {
-            ushort s = 0x0000;
-            s = CoarseX;
-            s = (ushort)(s << 5);
-            s += CoarseY;
-            s = (ushort)(s << 5);
-            s += (byte)(NameTableX ? 1 : 0);
-            s = (ushort)(s << 1);
-            s += (byte)(NameTableY ? 1 : 0);
-            s = (ushort)(s << 1);
-            s += FineY;
-            s = (ushort)(s << 4);
-            return s;
-        }
-
-        public void Set(ushort s)
-        {
-            CoarseX = (byte)((s >> 11) & 0x1F);
-            CoarseY = (byte)((s >> 6) & 0x1F);
-            NameTableX = IsBitSet(s, 5);
-            NameTableY = IsBitSet(s, 4);
-            FineY = (byte)((s >> 1) & 0x7);
-        }
-
-        private bool IsBitSet(ushort s, int pos)
-        {
-            return (s & (1 << pos)) != 0;
         }
     }
 }
