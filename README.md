@@ -15,7 +15,7 @@ Currently working on...
 - [x] Use MonoGame for gfx
 - [x] Successfully run nestest.nes with log verification
 - [ ] Finish implementing PPU
-- [ ] Fix cycle count for some opcodes (not 100% cycle compatible right now)
+- [x] Fix cycle count for some opcodes (not 100% cycle compatible right now)
 - [ ] Implement AUX devices (control input, etc)
 - [ ] Audio!
 - [ ] More mappers
