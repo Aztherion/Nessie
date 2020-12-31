@@ -48,7 +48,6 @@ namespace Nessie
         private byte _ppuDataBuffer = 0x00;
         public  bool RequestFrameDump { get; set; }
         private bool _performFrameDump;
-        private int _tileIdFetchCount;
 
         public PPU() 
         {
@@ -134,8 +133,6 @@ namespace Nessie
         }
         private void InitSprFrames()
         {
-            //_sprFrames[0] = new UInt32[342 * 262];
-            //_sprFrames[1] = new UInt32[342 * 262];
             _sprFrames[0] = new UInt32[256 * 240];
             _sprFrames[1] = new UInt32[256 * 240];
             for (var i = 0; i < 256 * 240; i++)
@@ -195,7 +192,6 @@ namespace Nessie
                             var y = tileY * 8 + row;
 
                             var pixelAddress = (128 * y) + x;
-                            //_sprPatternTables[ix][pixelAddress] = new NesPixel(0, 0, 0).ToUInt32();
                             _sprPatternTables[ix][pixelAddress] = GetColorFromPaletteRam(palette, pixel).ToUInt32();
                         }
                     }
@@ -206,10 +202,6 @@ namespace Nessie
 
         private NesPixel GetColorFromPaletteRam(byte palette, byte pixel)
         {
-            if (Debugger.IsAttached && palette > 0)
-            {
-                //Debugger.Break();
-            }
             var address = (ushort)(0x3F00 + (palette << 2) + pixel);
             var paletteId = PpuRead(address);
             return _palScreen[paletteId & 0x3F];
@@ -230,7 +222,6 @@ namespace Nessie
             var ret = new NesPixel[4];
             for(var i = 0; i < 4;i++)
             {
-                //ret[i] = new NesPixel(0, 0, 0);
                 ret[i] = GetColorFromPaletteRam(palette, (byte)i);
             }
             return ret;
@@ -512,14 +503,6 @@ namespace Nessie
                         case 0:
                             LoadBackgroundShifters();
                             _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF)));
-                            if (_performFrameDump)
-                            {
-                                _tileIdFetchCount++;
-                                var sTileId = _bgNextTileId.ToString("X").PadLeft(2, '0');
-                                var sAddress = ((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF))).ToString("X").PadLeft(2, '0');
-
-                                System.IO.File.AppendAllText(@"c:\tmp\framedump.txt", $"0x{sAddress}: 0x{sTileId}\r\n");
-                            }
                             break;
                         case 2:
                             ushort nameTableY = (ushort)((_vramAddr.NameTableY ? 1 : 0) << 11);
@@ -611,19 +594,11 @@ namespace Nessie
             }
 
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
-            if (bgPalette > 0)
-            {
-                if (Debugger.IsAttached)
-                {
-                    //Debugger.Break();
-                }
-            }
 
             if (_cycle >= 0 && _cycle < 256 && _scanline >= 0 && _scanline < 240)
             {
                 _sprFrames[frameIx][_cycle + ((_scanline) * 256)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
-            }
-            
+            }            
             
             _cycle++;
             if (_cycle >= 341)
@@ -638,13 +613,11 @@ namespace Nessie
                     if (_performFrameDump)
                     {
                         _performFrameDump = false;
-                        Console.WriteLine(_tileIdFetchCount);
                     }
                     if (RequestFrameDump)
                     {
                         RequestFrameDump = false;
                         _performFrameDump = true;
-                        _tileIdFetchCount = 0;
                     }
                 }
             }

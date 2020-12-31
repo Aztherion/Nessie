@@ -40,7 +40,7 @@ namespace Nessie
                 _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
             }
             _font = Content.Load<SpriteFont>("Font");
-            var cartridge = new Cartridge("Content/roms/dk.nes");
+            var cartridge = new Cartridge("Content/roms/nestest.nes");
             _nes.InsertCartridge(cartridge);
             _nes.Reset();
         }
@@ -83,6 +83,16 @@ namespace Nessie
 
         protected override void Update(GameTime gameTime)
         {
+            _nes.Controller[0] = 0x0;
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.X) ? 0x80 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.Z) ? 0x40 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.A) ? 0x20 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.S) ? 0x10 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.Up) ? 0x08 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.Down) ? 0x04 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.Left) ? 0x02 : 0x00);
+            _nes.Controller[0] |= (byte)(Keyboard.GetState().IsKeyDown(Keys.Right) ? 0x01 : 0x00);
+
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
@@ -101,7 +111,7 @@ namespace Nessie
             {
                 downKeys.Remove(Keys.E);
             }
-
+            /*
             if (Keyboard.GetState().IsKeyDown(Keys.D) && !downKeys.Contains(Keys.D))
             {
                 downKeys.Add(Keys.D);
@@ -110,6 +120,7 @@ namespace Nessie
             {
                 downKeys.Remove(Keys.D);
             }
+            */
 
             if (Keyboard.GetState().IsKeyDown(Keys.Space) && !downKeys.Contains(Keys.Space))
             {
