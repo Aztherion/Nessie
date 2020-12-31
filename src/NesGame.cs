@@ -28,7 +28,7 @@ namespace Nessie
         protected override void LoadContent()
         {
             _spriteBatch = new SpriteBatch(GraphicsDevice);
-            _frameCanvas = new Texture2D(GraphicsDevice, 341, 261);
+            _frameCanvas = new Texture2D(GraphicsDevice, 256, 240);
             _patternTableCanvas = new Texture2D[2];
             _patternTableCanvas[0] = new Texture2D(GraphicsDevice, 128, 128);
             _patternTableCanvas[1] = new Texture2D(GraphicsDevice, 128, 128);
@@ -253,7 +253,7 @@ namespace Nessie
                 }
             }
             */
-            _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 341 * 261);
+            _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 256 * 240);
             //_frameCanvas.SetData<UInt32>(data, 0, 341 * 261);
             _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, _palette), 0, 128 * 128);
             _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, _palette), 0, 128 * 128);
@@ -263,7 +263,7 @@ namespace Nessie
             }
 
             _spriteBatch.Begin();
-            _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 341, 261), Color.White);
+            _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 256, 240), Color.White);
             _spriteBatch.Draw(_patternTableCanvas[0], new Rectangle(400, 300, 128, 128), Color.White);
             _spriteBatch.Draw(_patternTableCanvas[1], new Rectangle(535, 300, 128, 128), Color.White);
             

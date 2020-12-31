@@ -134,9 +134,11 @@ namespace Nessie
         }
         private void InitSprFrames()
         {
-            _sprFrames[0] = new UInt32[342 * 262];
-            _sprFrames[1] = new UInt32[342 * 262];
-            for(var i = 0; i < 341 * 261; i++)
+            //_sprFrames[0] = new UInt32[342 * 262];
+            //_sprFrames[1] = new UInt32[342 * 262];
+            _sprFrames[0] = new UInt32[256 * 240];
+            _sprFrames[1] = new UInt32[256 * 240];
+            for (var i = 0; i < 256 * 240; i++)
             {
                 _sprFrames[0][i] = 0xFF0000FF;
                 _sprFrames[1][i] = 0xFF0000FF;
@@ -616,7 +618,12 @@ namespace Nessie
                     //Debugger.Break();
                 }
             }
-            _sprFrames[frameIx][_cycle + ((_scanline + 1) * 341)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
+
+            if (_cycle >= 0 && _cycle < 256 && _scanline >= 0 && _scanline < 240)
+            {
+                _sprFrames[frameIx][_cycle + ((_scanline) * 256)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
+            }
+            
             
             _cycle++;
             if (_cycle >= 341)
