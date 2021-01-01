@@ -6,6 +6,7 @@ namespace Nessie
     {
         public CPU Cpu;
         public PPU Ppu;
+        public APU Apu;
         public UInt64 SystemClockCounter;
         public byte[] Controller;
 
@@ -25,6 +26,7 @@ namespace Nessie
             InitializeControllers();
             Cpu = new CPU();
             Ppu = new PPU();
+            Apu = new APU();
             Cpu.ConnectBus(this);
         }
 
@@ -101,11 +103,16 @@ namespace Nessie
             _cartridge.Reset();
             Cpu.Reset();
             Ppu.Reset();
+            Apu.Reset();
             SystemClockCounter = 0;
         }
 
         public void Clock() 
         {
+            if (SystemClockCounter % 0xA == 0)
+            {
+                Apu.Clock();
+            }
             Ppu.Clock();
             if (SystemClockCounter % 3 == 0)
             {

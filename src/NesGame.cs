@@ -104,12 +104,14 @@ namespace Nessie
             if (Keyboard.GetState().IsKeyDown(Keys.E) && !downKeys.Contains(Keys.E))
             {
                 downKeys.Add(Keys.E);
-                ExportNametable(0);
-                ExportNametable(1);
+                _nes.Apu.PlayTone();
+                //ExportNametable(0);
+                //ExportNametable(1);
             }
             else if (Keyboard.GetState().IsKeyUp(Keys.E) && downKeys.Contains(Keys.E))
             {
                 downKeys.Remove(Keys.E);
+                _nes.Apu.StopTone();
             }
             /*
             if (Keyboard.GetState().IsKeyDown(Keys.D) && !downKeys.Contains(Keys.D))
@@ -267,15 +269,17 @@ namespace Nessie
             }
             */
             _frameCanvas.SetData<UInt32>(_nes.Ppu.GetActiveFrame(), 0, 256 * 240);
+            /*
             _patternTableCanvas[0].SetData<UInt32>(_nes.Ppu.GetPatternTable(0, _palette), 0, 128 * 128);
             _patternTableCanvas[1].SetData<UInt32>(_nes.Ppu.GetPatternTable(1, _palette), 0, 128 * 128);
             for (var i = 0; i < 8; i++)
             {
                 _paletteCanvas[i].SetData<UInt32>(GetPaletteData((byte)i), 0, 10 * 40);
             }
-
+            */
             _spriteBatch.Begin();
             _spriteBatch.Draw(_frameCanvas, new Rectangle(400, 10, 256 * 2, 240 * 2), Color.White);
+            /*
             _spriteBatch.Draw(_patternTableCanvas[0], new Rectangle(400, 520, 128, 128), Color.White);
             _spriteBatch.Draw(_patternTableCanvas[1], new Rectangle(535, 520, 128, 128), Color.White);
 
@@ -283,6 +287,8 @@ namespace Nessie
             {
                 _spriteBatch.Draw(_paletteCanvas[i], new Rectangle(400 + (i * 45), 500, 40, 10), Color.White);
             }
+            */
+            /*
             _spriteBatch.DrawString(_font, $"A: 0x{_nes.Cpu.A:X}", new Vector2(10, 10), Color.Black);
             _spriteBatch.DrawString(_font, $"X: 0x{_nes.Cpu.X:X}", new Vector2(10, 30), Color.Black);
             _spriteBatch.DrawString(_font, $"Y: 0x{_nes.Cpu.Y:X}", new Vector2(10, 50), Color.Black);
@@ -294,11 +300,14 @@ namespace Nessie
             _spriteBatch.DrawString(_font, $"Draw MS: {drawMs:F0}", new Vector2(10, 170), Color.Black);
             _spriteBatch.DrawString(_font, $"Frame Count: {frameCount:F0}", new Vector2(10, 190), Color.Black);
             _spriteBatch.DrawString(_font, $"SysClk: {_nes.SystemClockCounter:F0}", new Vector2(10, 210), Color.Black);
+            */
             _spriteBatch.DrawString(_font, $"FPS: {fps:F2}", new Vector2(10, 230), Color.Black);
+            /*
             _spriteBatch.DrawString(_font, $"Run: {runEmulation}", new Vector2(10, 250), Color.Black);
             _spriteBatch.DrawString(_font, $"Run MS: {elapsedRunMs:0}", new Vector2(10, 270), Color.Black);
             _spriteBatch.DrawString(_font, $"Draw count: {drawCount:0}", new Vector2(10, 290), Color.Black);
-
+            */
+            /*
             for(var i = 0; i < 16; i++)
             {
                 var label = i.ToString("X").PadLeft(2, '0');
@@ -308,7 +317,7 @@ namespace Nessie
                 var spriteAttrib = _nes.Ppu.OAM[i * 4 + 2].ToString("X").PadLeft(2, '0');
                 _spriteBatch.DrawString(_font, $"{label} {spriteX}, {spriteY}, ID {spriteId} AT {spriteAttrib}", new Vector2(10, 310 + (i * 20)), Color.Black);
             }
-
+            */
             _spriteBatch.End();
             base.Draw(gameTime);
             sw.Stop();
