@@ -7,7 +7,7 @@ namespace Nessie
     {
         public bool FrameComplete = false;
         public bool NMI { get; set; }
-        public byte[] OAM = new byte[64 * sizeof(ObjectAttributeEntry)];
+        public byte[] OAM = new byte[64 * 4];
 
         private readonly Bus _bus;
         private Cartridge _cartridge;
@@ -46,6 +46,11 @@ namespace Nessie
         private ushort _bgShifterPatternHi = 0x0000;
         private ushort _bgShifterAttribLo = 0x0000;
         private ushort _bgShifterAttribHi = 0x0000;
+
+        private byte[] _spriteScanline = new byte[8 * 4];
+        private byte _spriteCount;
+        private byte[] _spriteShifterPatternLo = new byte[8];
+        private byte[] _spriteShifterPatternHi = new byte[8];
 
         private byte _addressLatch = 0x00;
         private byte _ppuDataBuffer = 0x00;
@@ -257,7 +262,7 @@ namespace Nessie
                     data = _ppuDataBuffer;
                     _ppuDataBuffer = PpuRead(_vramAddr.Reg);
                     if (_vramAddr.Reg >= 0x3F00) data = _ppuDataBuffer;
-                    _vramAddr.Reg = (ushort)(_vramAddr.Reg + (_ctrlRegister.I ? 0x20 : 1));
+                    _vramAddr.Reg = (ushort)(_vramAddr.Reg + (_ctrlRegister.IncrementMode ? 0x20 : 1));
                     break;
             }
 
@@ -318,7 +323,7 @@ namespace Nessie
                     break;
                 case 0x0007: // PPU Data
                     PpuWrite(_vramAddr.Reg, data);
-                    _vramAddr.Reg = (ushort)(_vramAddr.Reg + (_ctrlRegister.I ? 0x20 : 1));
+                    _vramAddr.Reg = (ushort)(_vramAddr.Reg + (_ctrlRegister.IncrementMode ? 0x20 : 1));
                     break;
             }
         }
@@ -497,6 +502,14 @@ namespace Nessie
                 if (_scanline == -1 && _cycle == 1)
                 {
                     _statusRegister.VerticalBlank = false;
+
+                    _statusRegister.SpriteOverflow = false;
+
+                    for(var i = 0; i < 8; i++)
+                    {
+                        _spriteShifterPatternHi[i] = 0x0;
+                        _spriteShifterPatternLo[i] = 0x0;
+                    }
                 }
 
                 if ((_cycle >= 2 && _cycle < 258) || (_cycle >= 321 && _cycle < 338)) 
@@ -524,14 +537,14 @@ namespace Nessie
                             _bgNextTileAttrib = (byte)(_bgNextTileAttrib & 0x03);
                             break;
                         case 4:
-                            patternBackground = (ushort)((_ctrlRegister.B ? 1 : 0) << 12);
+                            patternBackground = (ushort)((_ctrlRegister.BackgroundTileSelect ? 1 : 0) << 12);
                             nextTileId = (ushort)(_bgNextTileId << 4);
                             fineY = (ushort)(_vramAddr.FineY + 0);
                             address = (ushort)(patternBackground + nextTileId + fineY);
                             _bgNextTileLsb = PpuRead(address);
                             break;
                         case 6:
-                            patternBackground = (ushort)((_ctrlRegister.B ? 1 : 0) << 12);
+                            patternBackground = (ushort)((_ctrlRegister.BackgroundTileSelect ? 1 : 0) << 12);
                             nextTileId = (ushort)(_bgNextTileId << 4);
                             fineY = (ushort)(_vramAddr.FineY + 8);
                             address = (ushort)(patternBackground + nextTileId + fineY);
@@ -555,14 +568,135 @@ namespace Nessie
                     TransferAddressX();
                 }
 
+                if (_scanline == -1 && _cycle >= 280 && _cycle < 305)
+                {
+                    TransferAddressY();
+                }
+
                 if (_cycle == 338 || _cycle == 340)
                 {
                     _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF)));
                 }
 
-                if (_scanline == -1 && _cycle >= 280 && _cycle < 305)
+                // Foreground rendering
+                if (_cycle == 257 && _scanline >= 0)
                 {
-                    TransferAddressY();
+                    ClearSpriteScanline();
+                    _spriteCount = 0;
+                    byte oamEntry = 0;
+                    while(oamEntry < 64 && _spriteCount < 9)
+                    {
+                        var diff = _scanline - OAM[(oamEntry * 4) + 0];
+                        if (diff >= 0 && diff < (_ctrlRegister.SpriteSize ? 16 : 8)) 
+                        {
+                            if (_spriteCount < 8)
+                            {
+                                Buffer.BlockCopy(OAM, oamEntry * 4, _spriteScanline, _spriteCount * 4, 4);
+                                _spriteCount++;
+                            }
+                        }
+                        oamEntry++;
+                    }
+                    _statusRegister.SpriteOverflow = (_spriteCount > 8);
+                }
+
+                if (_cycle == 340)
+                {
+                    for(var i = 0; i < _spriteCount; i++)
+                    {
+                        byte spritePatternBitsLo;
+                        byte spritePatternBitsHi;
+
+                        ushort spritePatternAddrLo;
+                        ushort spritePatternAddrHi;
+
+                        if (_ctrlRegister.SpriteSize)
+                        {
+                            // 8x16 sprite mode. 
+                            if ((_spriteScanline[i * 4 + 2] & 0x80) == 0x00)
+                            {
+                                // Sprite is NOT flipped vertically, i.e. normal
+                                if (_scanline - _spriteScanline[i * 4 + 0] < 8)
+                                {
+                                    // upper half
+                                    ushort patternSprite = (ushort)((_spriteScanline[i * 4 + 1] & 0x01) << 12);
+                                    byte tileId = (byte)((_spriteScanline[i * 4 + 1] & 0xFE) << 4);
+                                    ushort spriteY = (ushort)((_scanline - _spriteScanline[i * 4 + 0]) & 0x07);
+
+                                    spritePatternAddrLo = (ushort)(patternSprite | tileId | spriteY);
+                                } else
+                                {
+                                    // bottom half
+                                    // upper half
+                                    ushort patternSprite = (ushort)((_spriteScanline[i * 4 + 1] & 0x01) << 12);
+                                    byte tileId = (byte)(((_spriteScanline[i * 4 + 1] & 0xFE) + 1) << 4);
+                                    ushort spriteY = (ushort)((_scanline - _spriteScanline[i * 4 + 0]) & 0x07);
+
+                                    spritePatternAddrLo = (ushort)(patternSprite | tileId | spriteY);
+                                }
+                            }
+                            else
+                            {
+                                // Sprite is flipped vertically
+                                if (_scanline - _spriteScanline[i * 4 + 0] < 8)
+                                {
+                                    // upper half
+                                    ushort patternSprite = (ushort)((_spriteScanline[i * 4 + 1] & 0x01) << 12);
+                                    ushort tileId = (ushort)(((_spriteScanline[i * 4 + 1] & 0xFE) + 1) << 4);
+                                    ushort spriteY = (ushort)(7 - ((_scanline - _spriteScanline[i * 4 + 0]) & 0x07));
+
+                                    spritePatternAddrLo = (ushort)(patternSprite | tileId | spriteY);
+                                }
+                                else
+                                {
+                                    // bottom half
+                                    ushort patternSprite = (ushort)((_spriteScanline[i * 4 + 1] & 0x01) << 12);
+                                    ushort tileId = (ushort)((_spriteScanline[i * 4 + 1] & 0xFE) << 4);
+                                    ushort spriteY = (ushort)(7 - ((_scanline - _spriteScanline[i * 4 + 0]) & 0x07));
+
+                                    spritePatternAddrLo = (ushort)(patternSprite | tileId | spriteY);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // 8x8 sprite mode. 
+                            if ((_spriteScanline[i * 4 + 2] & 0x80) == 0x00)
+                            {
+                                // Sprite is NOT flipped vertically, i.e. normal
+                                //spritePatternAddrLo = _ctrlRegister.SpriteTileSelect
+                                ushort patternSprite = (ushort)((_ctrlRegister.SpriteTileSelect ? 1 : 0) << 12);
+                                ushort tileId = (ushort)(_spriteScanline[i * 4 + 1] << 4);
+                                ushort spriteY = (ushort)(_scanline - _spriteScanline[i * 4 + 0]);
+
+                                spritePatternAddrLo = (ushort)(patternSprite | tileId | spriteY);
+
+
+                            } else
+                            {
+                                // Sprite is flipped vertically
+                                ushort patternSprite = (ushort)((_ctrlRegister.SpriteTileSelect ? 1 : 0) << 12);
+                                ushort tileId = (ushort)(_spriteScanline[i * 4 + 1] << 4);
+                                ushort spriteY = (ushort)(7 - (_scanline - _spriteScanline[i * 4 + 0]));
+
+                                spritePatternAddrLo = (ushort)(patternSprite | tileId | spriteY);
+                            }
+                        }
+                        spritePatternAddrHi = (ushort)(spritePatternAddrLo + 8);
+
+                        spritePatternBitsHi = PpuRead(spritePatternAddrHi);
+                        spritePatternBitsLo = PpuRead(spritePatternAddrLo);
+
+                        // sprite flipped horizontally
+                        if ((_spriteScanline[i * 4 + 2] & 0x40) > 0)
+                        {
+                            spritePatternBitsHi = FlipByte(spritePatternBitsHi);
+                            spritePatternBitsLo = FlipByte(spritePatternBitsLo);
+                        }
+
+                        _spriteShifterPatternHi[i] = spritePatternBitsHi;
+                        _spriteShifterPatternLo[i] = spritePatternBitsLo;
+                    }
                 }
             }
 
@@ -576,7 +710,7 @@ namespace Nessie
                 if (_scanline == 241 && _cycle == 1)
                 {
                     _statusRegister.VerticalBlank = true;
-                    if (_ctrlRegister.V)
+                    if (_ctrlRegister.NmiEnable)
                     {
                         NMI = true;
                     }
@@ -601,11 +735,64 @@ namespace Nessie
                 bgPalette = (byte)((pal1 << 1) | pal0);                
             }
 
+            byte fgPixel = 0x00;
+            byte fgPalette = 0x00;
+            byte fgPriority = 0x00;
+
+            if (_maskRegister.SpriteEnable)
+            {
+                for(var i = 0; i < _spriteCount; i++)
+                {
+                    if (_spriteScanline[i * 4 + 3] == 0)
+                    {
+                        byte fgPixelLo = (byte)((_spriteShifterPatternLo[i] & 0x80) > 0 ? 1 : 0);
+                        byte fgPixelHi = (byte)((_spriteShifterPatternHi[i] & 0x80) > 0 ? 1 : 0);
+                        fgPixel = (byte)((fgPixelHi << 1) | fgPixelLo);
+
+                        fgPalette = (byte)((_spriteScanline[i * 4 + 2] & 0x03) + 0x04);
+                        fgPriority = (byte)((_spriteScanline[i * 4 + 2] & 0x20) == 0 ? 1 : 0);
+                        if (fgPixel != 0)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            byte pixel = 0x00; 
+            byte palette = 0x00;
+
+            if (bgPixel == 0 && fgPixel == 0) 
+            {
+                pixel = 0x00;
+                palette = 0x00;
+            } else if (bgPixel == 0 && fgPixel > 0)
+            {
+                pixel = fgPixel;
+                palette = fgPalette;
+            } else if (bgPixel > 0 && fgPixel == 0)
+            {
+                pixel = bgPixel;
+                palette = bgPalette;
+            } else if (bgPixel > 0 && fgPixel > 0)
+            {
+                if (fgPriority == 0)
+                {
+                    pixel = bgPixel;
+                    palette = bgPalette;
+                }
+                else
+                {
+                    pixel = fgPixel;
+                    palette = fgPalette;
+                }
+            }
+
             var frameIx = (byte)(_activeFrame == 0 ? 1 : 0);
 
             if (_cycle >= 0 && _cycle < 256 && _scanline >= 0 && _scanline < 240)
             {
-                _sprFrames[frameIx][_cycle + ((_scanline) * 256)] = GetColorFromPaletteRam(bgPalette, bgPixel).ToUInt32();
+                _sprFrames[frameIx][_cycle + ((_scanline) * 256)] = GetColorFromPaletteRam(palette, pixel).ToUInt32();
             }            
             
             _cycle++;
@@ -628,6 +815,22 @@ namespace Nessie
                         _performFrameDump = true;
                     }
                 }
+            }
+        }
+
+        private byte FlipByte(byte b)
+        {
+            b = (byte)((b & 0xF0) >> 4 | (b & 0x0F) << 4);
+            b = (byte)((b & 0xCC) >> 2 | (b & 0x33) << 2);
+            b = (byte)((b & 0xAA) >> 1 | (b & 0x55) << 1);
+            return b;
+        }
+
+        private void ClearSpriteScanline()
+        {
+            for(var i = 0; i < 8 * 4; i++)
+            {
+                _spriteScanline[i] = 0xFF;
             }
         }
 
@@ -711,16 +914,23 @@ namespace Nessie
 
                 _bgShifterAttribLo = (ushort)(_bgShifterAttribLo << 1);
                 _bgShifterAttribHi = (ushort)(_bgShifterAttribHi << 1);
+            }
 
+            if (_maskRegister.SpriteEnable && _cycle >= 1 && _cycle < 258)
+            {
+                for(var i = 0; i < _spriteCount; i++)
+                {
+                    if (_spriteScanline[i * 4 + 3] > 0)
+                    {
+                        _spriteScanline[i * 4 + 3] = (byte)(_spriteScanline[i * 4 + 3] - 1);
+                    } 
+                    else
+                    {
+                        _spriteShifterPatternLo[i] = (byte)(_spriteShifterPatternLo[i] << 1);
+                        _spriteShifterPatternHi[i] = (byte)(_spriteShifterPatternHi[i] << 1);
+                    }
+                }
             }
         }
-    }
-
-    struct ObjectAttributeEntry
-    {
-        byte Y;             // Y position of sprite
-        byte Id;            // Id of tile from pattern memory
-        byte Attribute;     // Flags define how sprite should be rendered
-        byte X;             // X position of sprite
     }
 }
