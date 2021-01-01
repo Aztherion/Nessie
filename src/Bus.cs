@@ -6,11 +6,19 @@ namespace Nessie
     {
         public CPU Cpu;
         public PPU Ppu;
-        private byte[] _cpuRam = new byte[2048];
         public UInt64 SystemClockCounter;
-        private Cartridge _cartridge;
         public byte[] Controller;
+
+        private byte[] _cpuRam = new byte[2048];
+        private Cartridge _cartridge;        
         private byte[] _controllerState;
+
+        private byte _dmaPage;
+        private byte _dmaAddress;
+        private byte _dmaData;
+
+        private bool _dmaTransfer;
+        private bool _dmaDummy = true;
 
         public Bus()
         {
@@ -34,6 +42,12 @@ namespace Nessie
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
                 Ppu.CpuWrite((ushort)(address & 0x0007), data);
+            }
+            else if (address == 0x4014)
+            {
+                _dmaPage = data;
+                _dmaAddress = 0x00;
+                _dmaTransfer = true;
             }
             else if(address >= 0x4016 && address <= 0x4017)
             {
@@ -95,7 +109,38 @@ namespace Nessie
             Ppu.Clock();
             if (SystemClockCounter % 3 == 0)
             {
-                Cpu.Clock(SystemClockCounter);
+                if (_dmaTransfer)
+                {
+                    if (_dmaDummy)
+                    {
+                        if (SystemClockCounter % 2 == 1)
+                        {
+                            _dmaDummy = false;
+                        }
+                    } 
+                    else
+                    {
+                        if (SystemClockCounter % 2 == 0)
+                        {
+                            var dmaAddress = (ushort)((_dmaPage << 8) | _dmaAddress);
+                            _dmaData = CpuRead(dmaAddress);
+                        } 
+                        else
+                        {
+                            Ppu.OAM[_dmaAddress] = _dmaData;
+                            _dmaAddress = (byte)(_dmaAddress + 1);
+                            if (_dmaAddress == 0x00)
+                            {
+                                _dmaTransfer = false;
+                                _dmaDummy = true;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    Cpu.Clock(SystemClockCounter);
+                }
             }
 
             if (Ppu.NMI)

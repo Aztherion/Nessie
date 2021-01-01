@@ -40,7 +40,7 @@ namespace Nessie
                 _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
             }
             _font = Content.Load<SpriteFont>("Font");
-            var cartridge = new Cartridge("Content/roms/nestest.nes");
+            var cartridge = new Cartridge("Content/roms/dk.nes");
             _nes.InsertCartridge(cartridge);
             _nes.Reset();
         }
@@ -298,6 +298,17 @@ namespace Nessie
             _spriteBatch.DrawString(_font, $"Run: {runEmulation}", new Vector2(10, 250), Color.Black);
             _spriteBatch.DrawString(_font, $"Run MS: {elapsedRunMs:0}", new Vector2(10, 270), Color.Black);
             _spriteBatch.DrawString(_font, $"Draw count: {drawCount:0}", new Vector2(10, 290), Color.Black);
+
+            for(var i = 0; i < 16; i++)
+            {
+                var label = i.ToString("X").PadLeft(2, '0');
+                var spriteY = _nes.Ppu.OAM[i * 4 + 0].ToString("F0").PadLeft(2, '0');
+                var spriteX = _nes.Ppu.OAM[i * 4 + 3].ToString("F0").PadLeft(2, '0');
+                var spriteId = _nes.Ppu.OAM[i * 4 + 1].ToString("X").PadLeft(2, '0');
+                var spriteAttrib = _nes.Ppu.OAM[i * 4 + 2].ToString("X").PadLeft(2, '0');
+                _spriteBatch.DrawString(_font, $"{label} {spriteX}, {spriteY}, ID {spriteId} AT {spriteAttrib}", new Vector2(10, 310 + (i * 20)), Color.Black);
+            }
+
             _spriteBatch.End();
             base.Draw(gameTime);
             sw.Stop();

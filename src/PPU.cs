@@ -7,6 +7,7 @@ namespace Nessie
     {
         public bool FrameComplete = false;
         public bool NMI { get; set; }
+        public byte[] OAM = new byte[64 * sizeof(ObjectAttributeEntry)];
 
         private readonly Bus _bus;
         private Cartridge _cartridge;
@@ -14,6 +15,8 @@ namespace Nessie
         private byte[][] _tblPattern = new byte[2][];
         private byte[] _tblPalette = new byte[32];
         
+        private byte _oamAddress;
+
         private ushort _cycle;
         private short _scanline;
 
@@ -244,6 +247,7 @@ namespace Nessie
                 case 0x0003: // OEM Address
                     break;
                 case 0x0004: // OEM Data
+                    data = OAM[_oamAddress];
                     break;
                 case 0x0005: // Scroll
                     break;
@@ -260,6 +264,8 @@ namespace Nessie
             return data;
         }
 
+        
+
         public void CpuWrite(ushort address, byte data) 
         {
             switch (address)
@@ -275,8 +281,10 @@ namespace Nessie
                 case 0x0002: // Status
                     break;
                 case 0x0003: // OEM Address
+                    _oamAddress = data;
                     break;
                 case 0x0004: // OEM Data
+                    OAM[_oamAddress] = data;
                     break;
                 case 0x0005: // Scroll
                     if (_addressLatch == 0)
@@ -706,5 +714,13 @@ namespace Nessie
 
             }
         }
+    }
+
+    struct ObjectAttributeEntry
+    {
+        byte Y;             // Y position of sprite
+        byte Id;            // Id of tile from pattern memory
+        byte Attribute;     // Flags define how sprite should be rendered
+        byte X;             // X position of sprite
     }
 }
