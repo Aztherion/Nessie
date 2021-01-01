@@ -51,6 +51,8 @@ namespace Nessie
         private byte _spriteCount;
         private byte[] _spriteShifterPatternLo = new byte[8];
         private byte[] _spriteShifterPatternHi = new byte[8];
+        private bool _spriteZeroHitPossible = false;
+        private bool _spriteZeroBeingRendered = false;
 
         private byte _addressLatch = 0x00;
         private byte _ppuDataBuffer = 0x00;
@@ -502,7 +504,7 @@ namespace Nessie
                 if (_scanline == -1 && _cycle == 1)
                 {
                     _statusRegister.VerticalBlank = false;
-
+                    _statusRegister.SpriteZeroHit = false;
                     _statusRegister.SpriteOverflow = false;
 
                     for(var i = 0; i < 8; i++)
@@ -582,6 +584,7 @@ namespace Nessie
                 if (_cycle == 257 && _scanline >= 0)
                 {
                     ClearSpriteScanline();
+                    _spriteZeroHitPossible = false;
                     _spriteCount = 0;
                     byte oamEntry = 0;
                     while(oamEntry < 64 && _spriteCount < 9)
@@ -591,6 +594,10 @@ namespace Nessie
                         {
                             if (_spriteCount < 8)
                             {
+                                if (oamEntry == 0)
+                                {
+                                    _spriteZeroHitPossible = true;
+                                }
                                 Buffer.BlockCopy(OAM, oamEntry * 4, _spriteScanline, _spriteCount * 4, 4);
                                 _spriteCount++;
                             }
@@ -741,6 +748,7 @@ namespace Nessie
 
             if (_maskRegister.SpriteEnable)
             {
+                _spriteZeroBeingRendered = false;
                 for(var i = 0; i < _spriteCount; i++)
                 {
                     if (_spriteScanline[i * 4 + 3] == 0)
@@ -753,6 +761,7 @@ namespace Nessie
                         fgPriority = (byte)((_spriteScanline[i * 4 + 2] & 0x20) == 0 ? 1 : 0);
                         if (fgPixel != 0)
                         {
+                            _spriteZeroBeingRendered = i == 0;
                             break;
                         }
                     }
@@ -785,6 +794,28 @@ namespace Nessie
                 {
                     pixel = fgPixel;
                     palette = fgPalette;
+                }
+
+                if (_spriteZeroHitPossible && _spriteZeroBeingRendered)
+                {
+                    if (_maskRegister.BackgroundEnable && _maskRegister.SpriteEnable)
+                    {
+                        var backgroundRenderLeft = _maskRegister.BackgroundLeftColumnEnable ? 1 : 0;
+                        var spriteRenderLeft = _maskRegister.SpriteLeftColumnEnable ? 1 : 0;
+                        if ((~(backgroundRenderLeft | spriteRenderLeft)) > 0)
+                        {
+                            if (_cycle >= 9 && _cycle < 258)
+                            {
+                                _statusRegister.SpriteZeroHit = true;
+                            }
+                        } else
+                        {
+                            if (_cycle >= 1 && _cycle < 258)
+                            {
+                                _statusRegister.SpriteZeroHit = true;
+                            }
+                        }
+                    }
                 }
             }
 
