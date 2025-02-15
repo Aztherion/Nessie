@@ -1,10 +1,12 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Nessie.Audio;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 
 namespace Nessie
 {
@@ -17,12 +19,14 @@ namespace Nessie
         Texture2D _frameCanvas;
         Texture2D[] _patternTableCanvas;
         Texture2D[] _paletteCanvas;
+        private Synth _synth;
 
         public NesGame()
         {
             _graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             _nes = new Bus();
+            _synth = new Synth();
             _graphics.PreferredBackBufferWidth = 1024;
             _graphics.PreferredBackBufferHeight = 768;
         }
@@ -40,10 +44,20 @@ namespace Nessie
                 _paletteCanvas[i] = new Texture2D(GraphicsDevice, 40, 10);
             }
             _font = Content.Load<SpriteFont>("Font");
-            var cartridge = new Cartridge("Content/roms/smb.nes");
+            // var cartridge = new Cartridge("Content/roms/nestest.nes");
+            var cartridge = new Cartridge(@"c:\tmp\nes roms\Super Mario Bros (E).nes");
             _nes.InsertCartridge(cartridge);
+            _nes.SetSampleFrequency(44100);
+            _synth.SetUserSoundOutFunction(() =>
+            {
+                // if (!runEmulation) return 0.0f;
+                while (!_nes.Clock()) { }
+                return (float)_nes.AudioSample;
+            });
             _nes.Reset();
         }
+
+        
 
         long renderFrameMs = 0;
         long drawMs = 0;
@@ -104,14 +118,12 @@ namespace Nessie
             if (Keyboard.GetState().IsKeyDown(Keys.E) && !downKeys.Contains(Keys.E))
             {
                 downKeys.Add(Keys.E);
-                _nes.Apu.PlayTone();
                 //ExportNametable(0);
                 //ExportNametable(1);
             }
             else if (Keyboard.GetState().IsKeyUp(Keys.E) && downKeys.Contains(Keys.E))
             {
                 downKeys.Remove(Keys.E);
-                _nes.Apu.StopTone();
             }
             /*
             if (Keyboard.GetState().IsKeyDown(Keys.D) && !downKeys.Contains(Keys.D))
@@ -161,7 +173,8 @@ namespace Nessie
                     downKeys.Add(Keys.C);
                     do
                     {
-                        _nes.Clock();
+                        Thread.Yield();
+                        // _nes.Clock();
                     } while (!_nes.Cpu.Complete);
                 } else if (Keyboard.GetState().IsKeyUp(Keys.C) && downKeys.Contains(Keys.C))
                 {
@@ -176,11 +189,13 @@ namespace Nessie
 
                     do
                     {
-                        _nes.Clock();
+                        Thread.Yield();
+                        // _nes.Clock();
                     } while (!_nes.Cpu.Complete);
                     do
                     {
-                        _nes.Clock();
+                        Thread.Yield();
+                        // _nes.Clock();
                     } while (!_nes.Ppu.FrameComplete);
                     _nes.Ppu.FrameComplete = false;
                     sw.Stop();
@@ -216,11 +231,13 @@ namespace Nessie
 
                     do
                     {
-                        _nes.Clock();
+                        Thread.Yield();
+                        //_nes.Clock();
                     } while (!_nes.Cpu.Complete);
                     do
                     {
-                        _nes.Clock();
+                        Thread.Yield();
+                        //_nes.Clock();
                     } while (!_nes.Ppu.FrameComplete);
                     _nes.Ppu.FrameComplete = false;
                     sw.Stop();

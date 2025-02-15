@@ -59,10 +59,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="APU.cs" />
-    <Compile Include="Audio\Oscillator.cs" />
     <Compile Include="Audio\SoundHelper.cs" />
     <Compile Include="Audio\Synth.cs" />
-    <Compile Include="Audio\Voice.cs" />
     <Compile Include="Bus.cs" />
     <Compile Include="Cartridge.cs" />
     <Compile Include="CPU.cs" />

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 
 namespace Nessie
 {
@@ -21,6 +22,15 @@ namespace Nessie
         private bool _dmaTransfer;
         private bool _dmaDummy = true;
 
+        private double _audioTime = 0.0;
+        private double _audioGlobalTime = 0.0;
+        private double _audioTimePerNESClock = 0.0;
+        private double _audioTimePerSystemSample = 0.0;
+
+        public double AudioSample = 0.0;
+
+        private int _clockLockFlag = 0;
+
         public Bus()
         {
             InitializeControllers();
@@ -28,6 +38,12 @@ namespace Nessie
             Ppu = new PPU();
             Apu = new APU();
             Cpu.ConnectBus(this);
+        }
+
+        public void SetSampleFrequency (double sampleRate)
+        {
+            _audioTimePerSystemSample = 1.0 / sampleRate;
+            _audioTimePerNESClock = 1.0 / 5369318.0;
         }
 
         // Main bus
@@ -44,6 +60,10 @@ namespace Nessie
             else if (address >= 0x2000 && address <= 0x3FFF)
             {
                 Ppu.CpuWrite((ushort)(address & 0x0007), data);
+            }
+            else if ((address >= 0x4000 && address <= 0x4013) || address == 0x4015 || address == 0x4017)
+            {
+                Apu.CpuWrite((ushort)address, data);
             }
             else if (address == 0x4014)
             {
@@ -107,56 +127,78 @@ namespace Nessie
             SystemClockCounter = 0;
         }
 
-        public void Clock() 
+        public bool Clock() 
         {
-            if (SystemClockCounter % 0xA == 0)
+            if (Interlocked.Exchange(ref _clockLockFlag, 1) == 1)
             {
-                Apu.Clock();
+                return false;
             }
-            Ppu.Clock();
-            if (SystemClockCounter % 3 == 0)
+
+            try
             {
-                if (_dmaTransfer)
+                Ppu.Clock();
+                Apu.Clock();
+                if (SystemClockCounter % 3 == 0)
                 {
-                    if (_dmaDummy)
+                    if (_dmaTransfer)
                     {
-                        if (SystemClockCounter % 2 == 1)
+                        if (_dmaDummy)
                         {
-                            _dmaDummy = false;
+                            if (SystemClockCounter % 2 == 1)
+                            {
+                                _dmaDummy = false;
+                            }
                         }
-                    } 
-                    else
-                    {
-                        if (SystemClockCounter % 2 == 0)
-                        {
-                            var dmaAddress = (ushort)((_dmaPage << 8) | _dmaAddress);
-                            _dmaData = CpuRead(dmaAddress);
-                        } 
                         else
                         {
-                            Ppu.OAM[_dmaAddress] = _dmaData;
-                            _dmaAddress = (byte)(_dmaAddress + 1);
-                            if (_dmaAddress == 0x00)
+                            if (SystemClockCounter % 2 == 0)
                             {
-                                _dmaTransfer = false;
-                                _dmaDummy = true;
+                                var dmaAddress = (ushort)((_dmaPage << 8) | _dmaAddress);
+                                _dmaData = CpuRead(dmaAddress);
+                            }
+                            else
+                            {
+                                Ppu.OAM[_dmaAddress] = _dmaData;
+                                _dmaAddress = (byte)(_dmaAddress + 1);
+                                if (_dmaAddress == 0x00)
+                                {
+                                    _dmaTransfer = false;
+                                    _dmaDummy = true;
+                                }
                             }
                         }
                     }
+                    else
+                    {
+                        Cpu.Clock(SystemClockCounter);
+                    }
                 }
-                else
+
+                var audioSampleReady = false;
+                _audioTime += _audioTimePerNESClock;
+                if (_audioTime >= _audioTimePerSystemSample)
                 {
-                    Cpu.Clock(SystemClockCounter);
+                    _audioTime -= _audioTimePerSystemSample;
+                    AudioSample = Apu.GetOutputSample();
+                    audioSampleReady = true;
                 }
-            }
 
-            if (Ppu.NMI)
+
+                if (Ppu.NMI)
+                {
+                    Ppu.NMI = false;
+                    Cpu.NMI();
+                }
+
+                SystemClockCounter++;
+
+                return audioSampleReady;
+            }
+            finally
             {
-                Ppu.NMI = false;
-                Cpu.NMI();
+                Interlocked.Exchange(ref _clockLockFlag, 0);
             }
 
-            SystemClockCounter++;
         }
 
         private void InitializeControllers()

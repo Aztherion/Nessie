@@ -37,10 +37,10 @@ namespace Nessie
 
         public void Print()
         {
-            Console.WriteLine("============================================================================================");
-            Console.WriteLine($"SP:${SP:X}\tPC:${PC:X}\tA:${A:X}\tX:${X:X}\tY:${Y:X}");
-            P.Print();
-            Console.WriteLine("============================================================================================");
+            // Console.WriteLine("============================================================================================");
+            // Console.WriteLine($"SP:${SP:X}\tPC:${PC:X}\tA:${A:X}\tX:${X:X}\tY:${Y:X}");
+            // P.Print();
+            // Console.WriteLine("============================================================================================");
         }
 
         #region Boot Init Execute
@@ -351,7 +351,7 @@ namespace Nessie
             {
                 if (OutputToConsole) 
                 { 
-                    Console.Write($"{InstructionCount}\t{PC:X} "); 
+                    // Console.Write($"{InstructionCount}\t{PC:X} "); 
                 } 
                 
                 var a = A.ToString("X");
@@ -371,7 +371,7 @@ namespace Nessie
                 OpcodeFuncPtrTable[opcode]();
                 if (OutputToConsole) 
                 { 
-                    Console.Write($"\t\tA:{a} X:{x} Y:{y} P:{p} SP:{sp} CYC:{((systemClock - 24) % 341),3}\r\n"); 
+                    // Console.Write($"\t\tA:{a} X:{x} Y:{y} P:{p} SP:{sp} CYC:{((systemClock - 24) % 341),3}\r\n"); 
                 }
             }
             else
@@ -408,7 +408,7 @@ namespace Nessie
             var data = Bus.CpuRead(address);
             if (OutputToConsole)
             {
-                Console.Write($" {data:X}");
+                // Console.Write($" {data:X}");
             }
             return data;
         }
@@ -3150,7 +3150,7 @@ namespace Nessie
 
         public void Print()
         {
-            Console.WriteLine(ToString());
+            // Console.WriteLine(ToString());
         }
 
         public void Set(byte s)
